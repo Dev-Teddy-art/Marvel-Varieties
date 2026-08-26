@@ -1,15 +1,12 @@
+// components/storefront/StorefrontClient.tsx
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import { useSearchParams } from 'next/navigation';
+import React, { useState } from 'react';
 import { Navbar } from '@/components/ui/Navbar';
 import { ProductCanvas } from '@/components/canvas/ProductCanvas';
 import { ProductCarousel } from '@/components/ui/ProductCarousel';
 import { Footer } from '@/components/ui/Footer';
 import { useCart } from '@/lib/store/useCart';
-import { getProductsAction } from '@/lib/actions';
 import { 
   ShoppingBag, 
   Sparkles, 
@@ -18,63 +15,27 @@ import {
   Check, 
   Building2, 
   ChevronRight, 
-  Loader2, 
-  PlusCircle,
-  Star,
-  Clock,
-  Zap
+  Star, 
+  Clock, 
+  Zap,
+  PlusCircle
 } from 'lucide-react';
+import Link from 'next/link';
 
-function HomePageContent() {
-  const searchParams = useSearchParams();
-  const initialCat = searchParams.get('category') || 'All Products';
+interface StorefrontProps {
+  initialProducts: any[];
+}
 
-  const [selectedCategory, setSelectedCategory] = useState(initialCat);
-  const [productsList, setProductsList] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any | null>(null);
-
+export function StorefrontClient({ initialProducts }: StorefrontProps) {
+  const [selectedCategory, setSelectedCategory] = useState('All Products');
   const { addItem, openCart } = useCart();
   const [addedId, setAddedId] = useState<string | null>(null);
 
-  // Sync category selection whenever URL search parameters change
-  useEffect(() => {
-    const queryCategory = searchParams.get('category');
-    if (queryCategory) {
-      setSelectedCategory(queryCategory);
-    }
-  }, [searchParams]);
-
-  // Load User from LocalStorage & Live Catalog from Neon DB
-  useEffect(() => {
-    const savedUser = localStorage.getItem('marvel_user');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (e) {
-        setUser(null);
-      }
-    }
-
-    async function loadCatalog() {
-      try {
-        const liveProducts = await getProductsAction();
-        setProductsList(liveProducts || []);
-      } catch (err) {
-        console.error('Error fetching live products from Neon:', err);
-        setProductsList([]);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadCatalog();
-  }, []);
-
   const filteredProducts = selectedCategory === 'All Products'
-    ? productsList
-    : productsList.filter((p) => p.category === selectedCategory);
+    ? initialProducts
+    : initialProducts.filter((p) => p.category === selectedCategory);
 
-  const featuredProducts = productsList.filter((p) => p.isFeatured);
+  const featuredProducts = initialProducts.filter((p) => p.isFeatured);
 
   const handleAddToCart = (product: any) => {
     addItem({
@@ -89,21 +50,10 @@ function HomePageContent() {
     openCart();
   };
 
-  const handleCategorySelection = (category: string) => {
-    setSelectedCategory(category);
-    const catalogEl = document.getElementById('catalog');
-    if (catalogEl) {
-      catalogEl.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col justify-between pb-16 lg:pb-0">
       <div>
-        <Navbar 
-          activeCategory={selectedCategory} 
-          onSelectCategory={handleCategorySelection} 
-        />
+        <Navbar activeCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-12 sm:space-y-16">
           
@@ -186,7 +136,7 @@ function HomePageContent() {
             </div>
           </section>
 
-          {/* Featured Spotlight Section */}
+          {/* FEATURED SPOTLIGHT */}
           {featuredProducts.length > 0 && (
             <section className="space-y-6">
               <div className="flex justify-between items-end border-b border-slate-200/80 pb-3">
@@ -258,7 +208,7 @@ function HomePageContent() {
             </section>
           )}
 
-          {/* Main Catalog Grid */}
+          {/* MAIN CATALOG */}
           <section id="catalog" className="space-y-6 pt-4">
             <div className="flex justify-between items-end border-b border-slate-200/80 pb-4">
               <div>
@@ -271,40 +221,15 @@ function HomePageContent() {
               </div>
             </div>
 
-            {loading ? (
-              <div className="py-20 flex flex-col items-center justify-center space-y-3">
-                <Loader2 size={32} className="animate-spin text-[#0B1B3D]" />
-                <p className="text-xs text-slate-400 font-semibold">Loading catalog from Neon DB...</p>
-              </div>
-            ) : filteredProducts.length === 0 ? (
-              <div className="bg-white p-10 sm:p-14 rounded-3xl border border-slate-100 text-center space-y-3 max-w-md mx-auto shadow-sm">
+            {filteredProducts.length === 0 ? (
+              <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center space-y-3 max-w-md mx-auto">
                 <div className="h-14 w-14 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-400">
-                  <ShoppingBag size={26} />
+                  <ShoppingBag size={28} />
                 </div>
-                <h3 className="text-base font-black text-[#0B1B3D]">No Products Available Yet</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  We are currently restocking this collection. Explore our other categories or check back shortly.
+                <h3 className="text-base font-bold text-slate-800">No Products in this Category</h3>
+                <p className="text-xs text-slate-500">
+                  Select another category or add items in the Admin panel.
                 </p>
-
-                <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2.5">
-                  <button
-                    onClick={() => handleCategorySelection('All Products')}
-                    className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold px-5 py-2.5 rounded-xl transition cursor-pointer"
-                  >
-                    View All Products
-                  </button>
-
-                  {/* ONLY VISIBLE TO VERIFIED ADMINS */}
-                  {user?.role === 'admin' && (
-                    <Link
-                      href="/admin"
-                      className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 bg-[#0B1B3D] hover:bg-[#142752] text-white text-xs font-bold px-5 py-2.5 rounded-xl transition shadow-sm"
-                    >
-                      <PlusCircle size={14} className="text-[#D4AF37]" />
-                      <span>Add Products in Admin</span>
-                    </Link>
-                  )}
-                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -359,7 +284,7 @@ function HomePageContent() {
             )}
           </section>
 
-          {/* Credibility Guarantee Section */}
+          {/* CREDIBILITY GUARANTEE SECTION */}
           <section className="rounded-3xl bg-gradient-to-br from-[#0B1B3D] via-[#10234d] to-slate-950 p-6 sm:p-12 text-white shadow-2xl relative overflow-hidden space-y-8">
             <div className="absolute top-0 right-0 w-96 h-96 bg-[#D4AF37]/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -413,17 +338,5 @@ function HomePageContent() {
 
       <Footer />
     </div>
-  );
-}
-
-export default function HomePage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center">
-        <Loader2 size={32} className="animate-spin text-[#0B1B3D]" />
-      </div>
-    }>
-      <HomePageContent />
-    </Suspense>
   );
 }
