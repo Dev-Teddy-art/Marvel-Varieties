@@ -9,6 +9,11 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata = {
   title: 'Marvel Varieties | Your One-Stop Destination',
   description: 'Premium essentials with verified direct bank transfer and nationwide fulfillment.',
+  icons: {
+    icon: '/MARVEL VARIETIES.png',
+    shortcut: '/MARVEL VARIETIES.png',
+    apple: '/MARVEL VARIETIES.png',
+  }
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -45,7 +45,7 @@ export function ProductQuickViewModal({ product, onClose }: ProductQuickViewModa
     openCart();
   };
 
-  const whatsappInquiryUrl = `https://wa.me/2348146875777?text=${encodeURIComponent(
+  const whatsappInquiryUrl = `https://wa.me/2347062297299?text=${encodeURIComponent(
     `Hello Marvel Varieties, I am interested in inquiring about: ${product.title} (₦${product.price?.toLocaleString()})`
   )}`;
 
