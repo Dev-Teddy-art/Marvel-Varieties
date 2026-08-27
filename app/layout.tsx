@@ -11,9 +11,9 @@ export const metadata = {
   description: 'Premium essentials with verified direct bank transfer and nationwide fulfillment.',
   icons: {
     icon: '/MARVEL VARIETIES.png',
-    shortcut: '/marvel-varieties/public/MARVEL_VARIETIES-removebg-preview.png',
+    shortcut: '/MARVEL VARIETIES.png',
     apple: '/MARVEL VARIETIES.png',
-  }
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

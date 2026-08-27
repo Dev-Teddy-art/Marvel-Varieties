@@ -18,11 +18,11 @@ export function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           
-          {/* Brand & Overview */}
+          {/* Brand & Transparent Logo */}
           <div className="space-y-4">
             <div className="relative h-10 w-36">
               <Image 
-                src="/marvel-varieties/public/MARVEL_VARIETIES-removebg-preview.png" 
+                src="/MARVEL_VARIETIES-removebg-preview.png" 
                 alt="Marvel Varieties" 
                 fill 
                 className="object-contain brightness-0 invert" 
@@ -62,7 +62,7 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Verified Payment Account */}
+          {/* OPay Account Verified Details */}
           <div className="space-y-3">
             <h4 className="font-black uppercase tracking-widest text-[#D4AF37] text-[10px]">Payment Verification</h4>
             <div className="bg-white/5 border border-white/10 p-4 rounded-2xl space-y-2">

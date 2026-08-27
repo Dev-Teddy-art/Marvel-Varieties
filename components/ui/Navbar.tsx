@@ -12,10 +12,8 @@ import {
   Menu, 
   X, 
   Truck, 
-  ChevronRight,
-  ShieldAlert,
-  Phone,
-  MessageCircle
+  ChevronRight, 
+  MessageCircle 
 } from 'lucide-react';
 
 const CATEGORIES = [
@@ -55,7 +53,7 @@ export function Navbar({ activeCategory = 'All Products', onSelectCategory }: Na
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200/80 shadow-sm">
-      {/* Top Banner */}
+      {/* Top Notification Bar */}
       <div className="bg-[#0B1B3D] text-slate-300 text-[11px] py-1.5 px-4 hidden sm:block border-b border-white/10">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-2">
@@ -78,14 +76,14 @@ export function Navbar({ activeCategory = 'All Products', onSelectCategory }: Na
         </div>
       </div>
 
-      {/* Main Navbar */}
+      {/* Main Bar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 sm:h-20 gap-4">
-          {/* Logo */}
+          {/* Logo with Transparent Background */}
           <Link href="/" className="flex items-center gap-2 shrink-0">
             <div className="relative h-10 w-32 sm:h-12 sm:w-40">
               <Image 
-                src="/MARVEL VARIETIES.png" 
+                src="/MARVEL_VARIETIES-removebg-preview.png" 
                 alt="Marvel Varieties" 
                 fill 
                 className="object-contain" 
@@ -104,7 +102,7 @@ export function Navbar({ activeCategory = 'All Products', onSelectCategory }: Na
             <Search className="absolute left-3.5 top-3 text-slate-400" size={16} />
           </div>
 
-          {/* Action Icons */}
+          {/* Nav Actions */}
           <div className="flex items-center gap-2 sm:gap-4">
             <Link 
               href="/track" 
@@ -124,7 +122,7 @@ export function Navbar({ activeCategory = 'All Products', onSelectCategory }: Na
               </span>
             </Link>
 
-            {/* Shopping Bag Button */}
+            {/* Cart Trigger */}
             <button
               onClick={openCart}
               className="relative bg-[#0B1B3D] text-white p-2.5 sm:px-4 sm:py-2.5 rounded-xl flex items-center gap-2 shadow-md hover:bg-[#142752] transition cursor-pointer"
@@ -138,7 +136,7 @@ export function Navbar({ activeCategory = 'All Products', onSelectCategory }: Na
               )}
             </button>
 
-            {/* Mobile Menu Button */}
+            {/* Mobile Menu Toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="md:hidden p-2 text-slate-600 hover:text-[#0B1B3D] rounded-xl hover:bg-slate-100 transition"
@@ -149,7 +147,7 @@ export function Navbar({ activeCategory = 'All Products', onSelectCategory }: Na
         </div>
       </div>
 
-      {/* Category Navigation Bar */}
+      {/* Category Bar */}
       <div className="border-t border-slate-100 hidden md:block bg-slate-50/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex items-center gap-1 overflow-x-auto py-2 scrollbar-none text-xs font-bold">
@@ -173,7 +171,7 @@ export function Navbar({ activeCategory = 'All Products', onSelectCategory }: Na
         </div>
       </div>
 
-      {/* Mobile Drawer Menu */}
+      {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-slate-200 bg-white px-4 py-4 space-y-4 shadow-xl">
           <div className="space-y-1">
