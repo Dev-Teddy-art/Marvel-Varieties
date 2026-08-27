@@ -1,3 +1,4 @@
+// lib/actions.ts
 'use server';
 
 import { db } from '@/lib/db';
@@ -25,6 +26,7 @@ export async function addProductAction(formData: {
   description?: string;
   images: string[];
   inStock: boolean;
+  stockQuantity?: number;
   isFeatured?: boolean;
 }) {
   try {
@@ -42,6 +44,7 @@ export async function addProductAction(formData: {
       imageUrl: allImages[0],
       images: allImages,
       inStock: formData.inStock,
+      stockQuantity: formData.stockQuantity ?? 10,
       isFeatured: formData.isFeatured || false,
     });
 
@@ -61,6 +64,7 @@ export async function updateProductAction(id: string, formData: {
   description?: string;
   images: string[];
   inStock: boolean;
+  stockQuantity?: number;
   isFeatured: boolean;
 }) {
   try {
@@ -76,6 +80,7 @@ export async function updateProductAction(id: string, formData: {
       imageUrl: allImages[0],
       images: allImages,
       inStock: formData.inStock,
+      stockQuantity: formData.stockQuantity ?? 10,
       isFeatured: formData.isFeatured,
     }).where(eq(products.id, id));
 
@@ -95,13 +100,12 @@ export async function deleteProductAction(id: string) {
     revalidatePath('/admin');
     return { success: true };
   } catch (error) {
-    console.error('Failed to delete product:', error);
     return { success: false };
   }
 }
 
 // ==========================================
-// 2. ORDER ACTIONS (WITH DELETE ORDER)
+// 2. ORDER ACTIONS (WITH OPTIONAL DROPSHIP DUAL ADDRESS)
 // ==========================================
 
 export async function getOrdersAction() {
@@ -117,9 +121,13 @@ export async function createOrderAction(orderData: {
   orderReference: string;
   customerName: string;
   customerPhone: string;
-  customerEmail: string;
+  customerEmail?: string;
   deliveryState: string;
   deliveryAddress: string;
+  recipientName?: string;
+  recipientPhone?: string;
+  alternateAddress?: string;
+  isDropship?: boolean;
   totalAmount: number;
   receiptUrl?: string;
   items: any;
@@ -130,15 +138,20 @@ export async function createOrderAction(orderData: {
       id,
       orderReference: orderData.orderReference,
       customerName: orderData.customerName,
-      customerPhone: orderData.customerPhone,
-      customerEmail: orderData.customerEmail,
+      customerPhone: orderData.customerPhone.trim(),
+      customerEmail: orderData.customerEmail ? orderData.customerEmail.trim().toLowerCase() : '',
       deliveryState: orderData.deliveryState,
       deliveryAddress: orderData.deliveryAddress,
+      recipientName: orderData.recipientName || '',
+      recipientPhone: orderData.recipientPhone || '',
+      alternateAddress: orderData.alternateAddress || '',
+      isDropship: orderData.isDropship || false,
       totalAmount: orderData.totalAmount,
       receiptUrl: orderData.receiptUrl,
       status: 'pending_verification',
       items: orderData.items,
     });
+
     revalidatePath('/admin');
     revalidatePath('/account');
     return { success: true };
@@ -156,7 +169,6 @@ export async function updateOrderStatusAction(orderId: string, newStatus: string
     revalidatePath('/account');
     return { success: true };
   } catch (error) {
-    console.error('Failed to update status:', error);
     return { success: false };
   }
 }
@@ -169,23 +181,29 @@ export async function deleteOrderAction(id: string) {
     revalidatePath('/track');
     return { success: true };
   } catch (error) {
-    console.error('Failed to delete order:', error);
-    return { success: false, error: 'Database error deleting order' };
+    return { success: false };
   }
 }
 
 export async function searchOrderAction(query: string) {
   try {
     const cleaned = query.trim();
+    const cleanPhone = query.replace(/[^0-9+]/g, '');
+
     const results = await db
       .select()
       .from(orders)
-      .where(or(eq(orders.orderReference, cleaned), eq(orders.customerPhone, cleaned)))
+      .where(
+        or(
+          eq(orders.orderReference, cleaned),
+          eq(orders.customerPhone, cleaned),
+          eq(orders.customerPhone, cleanPhone)
+        )
+      )
       .limit(1);
 
     return results[0] || null;
   } catch (error) {
-    console.error('Failed to find order:', error);
     return null;
   }
 }
@@ -199,10 +217,11 @@ export async function registerUserAction(data: {
   email: string;
   phone: string;
   password: string;
+  customRole?: 'admin' | 'editor' | 'customer';
 }) {
   try {
     const cleanEmail = data.email.toLowerCase().trim();
-    const cleanPhone = data.phone.trim();
+    const cleanPhone = data.phone.replace(/[^0-9+]/g, '');
 
     const existing = await db
       .select()
@@ -215,37 +234,51 @@ export async function registerUserAction(data: {
     }
 
     const id = `usr_${Date.now()}`;
-    const role = cleanEmail.includes('admin') || cleanEmail.includes('marvel') ? 'admin' : 'customer';
+    let assignedRole = data.customRole || 'customer';
+    if (!data.customRole) {
+      if (cleanEmail.includes('staff') || cleanEmail.includes('editor')) {
+        assignedRole = 'editor';
+      } else if (cleanEmail.includes('admin') || cleanEmail.includes('marvel')) {
+        assignedRole = 'admin';
+      }
+    }
 
     await db.insert(users).values({
       id,
-      fullName: data.fullName,
+      fullName: data.fullName.trim(),
       email: cleanEmail,
       phone: cleanPhone,
       password: data.password,
-      role,
+      role: assignedRole,
     });
 
     return { 
       success: true, 
-      user: { id, fullName: data.fullName, email: cleanEmail, phone: cleanPhone, role } 
+      user: { id, fullName: data.fullName.trim(), email: cleanEmail, phone: cleanPhone, role: assignedRole } 
     };
-  } catch (error) {
-    console.error('Registration failed:', error);
-    return { success: false, error: 'Database error creating account' };
+  } catch (error: any) {
+    return { success: false, error: error?.message || 'Database error creating account' };
   }
 }
 
 export async function loginUserAction(identifier: string, pass: string) {
   try {
-    const cleaned = identifier.trim().toLowerCase();
+    const raw = identifier.trim().toLowerCase();
+    const cleanPhone = identifier.replace(/[^0-9+]/g, '');
+
     const found = await db
       .select()
       .from(users)
-      .where(or(eq(users.email, cleaned), eq(users.phone, cleaned)))
+      .where(
+        or(
+          eq(users.email, raw),
+          eq(users.phone, raw),
+          eq(users.phone, cleanPhone)
+        )
+      )
       .limit(1);
 
-    if (found.length === 0 || found[0].password !== pass) {
+    if (!found || found.length === 0 || found[0].password !== pass) {
       return { success: false, error: 'Invalid email/phone or password.' };
     }
 
@@ -260,22 +293,28 @@ export async function loginUserAction(identifier: string, pass: string) {
         role: u.role,
       },
     };
-  } catch (error) {
-    console.error('Login error:', error);
-    return { success: false, error: 'Login failed' };
+  } catch (error: any) {
+    return { success: false, error: error?.message || 'Database connection error' };
   }
 }
 
 export async function getCustomerOrdersAction(phoneOrEmail: string) {
   try {
-    const cleaned = phoneOrEmail.trim();
+    const cleaned = phoneOrEmail.trim().toLowerCase();
+    const cleanPhone = phoneOrEmail.replace(/[^0-9+]/g, '');
+
     return await db
       .select()
       .from(orders)
-      .where(or(eq(orders.customerPhone, cleaned), eq(orders.customerEmail, cleaned)))
+      .where(
+        or(
+          eq(orders.customerPhone, cleaned),
+          eq(orders.customerPhone, cleanPhone),
+          eq(orders.customerEmail, cleaned)
+        )
+      )
       .orderBy(desc(orders.createdAt));
   } catch (error) {
-    console.error('Error fetching customer orders:', error);
     return [];
   }
 }

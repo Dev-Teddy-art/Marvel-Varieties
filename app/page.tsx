@@ -1,3 +1,4 @@
+// app/page.tsx
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -7,6 +8,7 @@ import { useSearchParams } from 'next/navigation';
 import { Navbar } from '@/components/ui/Navbar';
 import { ProductCanvas } from '@/components/canvas/ProductCanvas';
 import { ProductCarousel } from '@/components/ui/ProductCarousel';
+import { ProductQuickViewModal } from '@/components/ui/ProductQuickViewModal';
 import { Footer } from '@/components/ui/Footer';
 import { useCart } from '@/lib/store/useCart';
 import { getProductsAction } from '@/lib/actions';
@@ -22,8 +24,11 @@ import {
   PlusCircle,
   Star,
   Clock,
-  Zap
+  Zap,
+  Eye,
+  Boxes
 } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 
 function HomePageContent() {
   const searchParams = useSearchParams();
@@ -34,10 +39,12 @@ function HomePageContent() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any | null>(null);
 
+  // Enlargement Modal Target
+  const [enlargedProduct, setEnlargedProduct] = useState<any | null>(null);
+
   const { addItem, openCart } = useCart();
   const [addedId, setAddedId] = useState<string | null>(null);
 
-  // Sync category selection whenever URL search parameters change
   useEffect(() => {
     const queryCategory = searchParams.get('category');
     if (queryCategory) {
@@ -45,7 +52,6 @@ function HomePageContent() {
     }
   }, [searchParams]);
 
-  // Load User from LocalStorage & Live Catalog from Neon DB
   useEffect(() => {
     const savedUser = localStorage.getItem('marvel_user');
     if (savedUser) {
@@ -61,7 +67,7 @@ function HomePageContent() {
         const liveProducts = await getProductsAction();
         setProductsList(liveProducts || []);
       } catch (err) {
-        console.error('Error fetching live products from Neon:', err);
+        console.error('Error fetching live products:', err);
         setProductsList([]);
       } finally {
         setLoading(false);
@@ -76,7 +82,8 @@ function HomePageContent() {
 
   const featuredProducts = productsList.filter((p) => p.isFeatured);
 
-  const handleAddToCart = (product: any) => {
+  const handleAddToCart = (product: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     addItem({
       id: product.id,
       title: product.title,
@@ -146,7 +153,6 @@ function HomePageContent() {
                 </div>
               </div>
 
-              {/* 3D Visualizer Canvas */}
               <div className="lg:col-span-5 h-56 sm:h-80 w-full relative">
                 <ProductCanvas />
               </div>
@@ -207,7 +213,8 @@ function HomePageContent() {
                 {featuredProducts.map((product) => (
                   <div
                     key={product.id}
-                    className="bg-white rounded-3xl border-2 border-[#D4AF37]/30 overflow-hidden shadow-md hover:shadow-2xl transition flex flex-col justify-between group relative"
+                    onClick={() => setEnlargedProduct(product)}
+                    className="bg-white rounded-3xl border-2 border-[#D4AF37]/30 overflow-hidden shadow-md hover:shadow-2xl transition flex flex-col justify-between group relative cursor-pointer"
                   >
                     <div className="relative">
                       <ProductCarousel
@@ -231,26 +238,43 @@ function HomePageContent() {
                         <p className="text-lg font-black text-[#0B1B3D] mt-1">
                           ₦{product.price?.toLocaleString()}
                         </p>
+                        {product.stockQuantity && product.stockQuantity <= 5 && (
+                          <p className="text-[10px] font-bold text-amber-700 mt-0.5">
+                            ⚡ Only {product.stockQuantity} left
+                          </p>
+                        )}
                       </div>
 
-                      <button
-                        onClick={() => handleAddToCart(product)}
-                        className={`w-full py-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
-                          addedId === product.id
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-[#0B1B3D] hover:bg-[#142752] text-white shadow-md'
-                        }`}
-                      >
-                        {addedId === product.id ? (
-                          <>
-                            <Check size={14} /> Added to Bag
-                          </>
-                        ) : (
-                          <>
-                            <ShoppingBag size={14} className="text-[#D4AF37]" /> Add to Bag
-                          </>
-                        )}
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEnlargedProduct(product);
+                          }}
+                          className="bg-slate-100 hover:bg-slate-200 text-slate-700 p-3 rounded-xl transition cursor-pointer"
+                          title="Quick View Details"
+                        >
+                          <Eye size={15} />
+                        </button>
+                        <button
+                          onClick={(e) => handleAddToCart(product, e)}
+                          className={`flex-1 py-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                            addedId === product.id
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-[#0B1B3D] hover:bg-[#142752] text-white shadow-md'
+                          }`}
+                        >
+                          {addedId === product.id ? (
+                            <>
+                              <Check size={14} /> Added
+                            </>
+                          ) : (
+                            <>
+                              <ShoppingBag size={14} className="text-[#D4AF37]" /> Add to Bag
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -294,8 +318,7 @@ function HomePageContent() {
                     View All Products
                   </button>
 
-                  {/* ONLY VISIBLE TO VERIFIED ADMINS */}
-                  {user?.role === 'admin' && (
+                  {(user?.role === 'admin' || user?.role === 'editor') && (
                     <Link
                       href="/admin"
                       className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 bg-[#0B1B3D] hover:bg-[#142752] text-white text-xs font-bold px-5 py-2.5 rounded-xl transition shadow-sm"
@@ -311,7 +334,8 @@ function HomePageContent() {
                 {filteredProducts.map((product) => (
                   <div
                     key={product.id}
-                    className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-xl transition flex flex-col justify-between group"
+                    onClick={() => setEnlargedProduct(product)}
+                    className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-xl transition flex flex-col justify-between group cursor-pointer"
                   >
                     <div className="relative">
                       <ProductCarousel
@@ -332,26 +356,43 @@ function HomePageContent() {
                         <p className="text-base font-black text-[#0B1B3D] mt-1">
                           ₦{product.price?.toLocaleString()}
                         </p>
+                        {product.stockQuantity && (
+                          <p className="text-[10px] font-semibold text-slate-400 mt-0.5">
+                            {product.stockQuantity} remaining
+                          </p>
+                        )}
                       </div>
 
-                      <button
-                        onClick={() => handleAddToCart(product)}
-                        className={`w-full py-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
-                          addedId === product.id
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-[#0B1B3D] hover:bg-[#142752] text-white shadow-md'
-                        }`}
-                      >
-                        {addedId === product.id ? (
-                          <>
-                            <Check size={14} /> Added to Bag
-                          </>
-                        ) : (
-                          <>
-                            <ShoppingBag size={14} className="text-[#D4AF37]" /> Add to Bag
-                          </>
-                        )}
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEnlargedProduct(product);
+                          }}
+                          className="bg-slate-100 hover:bg-slate-200 text-slate-700 p-3 rounded-xl transition cursor-pointer"
+                          title="Enlarge & Inspect"
+                        >
+                          <Eye size={15} />
+                        </button>
+                        <button
+                          onClick={(e) => handleAddToCart(product, e)}
+                          className={`flex-1 py-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                            addedId === product.id
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-[#0B1B3D] hover:bg-[#142752] text-white shadow-md'
+                          }`}
+                        >
+                          {addedId === product.id ? (
+                            <>
+                              <Check size={14} /> Added
+                            </>
+                          ) : (
+                            <>
+                              <ShoppingBag size={14} className="text-[#D4AF37]" /> Add to Bag
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -412,6 +453,16 @@ function HomePageContent() {
       </div>
 
       <Footer />
+
+      {/* QUICK VIEW ENLARGEMENT MODAL */}
+      <AnimatePresence>
+        {enlargedProduct && (
+          <ProductQuickViewModal
+            product={enlargedProduct}
+            onClose={() => setEnlargedProduct(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

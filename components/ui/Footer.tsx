@@ -1,121 +1,118 @@
 // components/ui/Footer.tsx
-'use client';
-
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { 
-  Phone, 
+  Building2, 
   MapPin, 
+  Phone, 
   Clock, 
   ShieldCheck, 
-  Truck, 
-  Building2, 
-  CheckCircle2, 
-  ArrowRight 
+  ArrowUpRight,
+  MessageCircle
 } from 'lucide-react';
 
 export function Footer() {
   return (
-    <footer className="bg-[#0B1B3D] text-white border-t border-slate-800 pt-12 pb-8 mt-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
-        
-        {/* Main 4-Column Layout */}
+    <footer className="bg-[#070F22] text-white border-t border-slate-800 text-xs">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           
-          {/* Brand Col */}
+          {/* Brand & Overview */}
           <div className="space-y-4">
-            <div className="relative h-10 w-44">
-              <Image
-                src="/MARVEL VARIETIES.png"
-                alt="Marvel Varieties"
-                fill
-                className="object-contain"
-                priority
+            <div className="relative h-10 w-36">
+              <Image 
+                src="/MARVEL VARIETIES.png" 
+                alt="Marvel Varieties" 
+                fill 
+                className="object-contain brightness-0 invert" 
               />
             </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
+            <p className="text-slate-400 leading-relaxed text-[11px]">
               Your one-stop destination for quality household items, kitchen appliances, designer footwear, fashion, and gadgets with direct bank transfer payment verification.
             </p>
-            <div className="inline-flex items-center gap-2 bg-[#D4AF37]/20 border border-[#D4AF37]/40 px-3 py-1.5 rounded-full text-[#D4AF37] text-[11px] font-bold">
-              <ShieldCheck size={14} /> Registered Enterprise
+            <div className="inline-flex items-center gap-1.5 bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl text-slate-300">
+              <ShieldCheck size={14} className="text-[#D4AF37]" />
+              <span className="text-[10px] font-bold tracking-wide">Registered Enterprise</span>
             </div>
           </div>
 
           {/* Quick Links */}
           <div className="space-y-3">
-            <h4 className="text-xs font-black uppercase tracking-wider text-[#D4AF37]">
-              Customer Service
-            </h4>
-            <ul className="space-y-2 text-xs text-slate-300">
+            <h4 className="font-black uppercase tracking-widest text-[#D4AF37] text-[10px]">Customer Service</h4>
+            <ul className="space-y-2 text-slate-400">
               <li>
-                <Link href="/track" className="hover:text-white transition flex items-center gap-1.5">
-                  <ArrowRight size={12} className="text-[#D4AF37]" /> Track Order Dispatch
+                <Link href="/track" className="hover:text-white transition flex items-center gap-1">
+                  <span>Track Order Dispatch</span>
+                  <ArrowUpRight size={12} />
                 </Link>
               </li>
               <li>
-                <Link href="/account" className="hover:text-white transition flex items-center gap-1.5">
-                  <ArrowRight size={12} className="text-[#D4AF37]" /> Customer Account & Orders
+                <Link href="/account" className="hover:text-white transition flex items-center gap-1">
+                  <span>Customer Account & Orders</span>
+                  <ArrowUpRight size={12} />
                 </Link>
               </li>
               <li>
-                <Link href="/#catalog" className="hover:text-white transition flex items-center gap-1.5">
-                  <ArrowRight size={12} className="text-[#D4AF37]" /> Browse Storefront Catalog
-                </Link>
+                <a href="#catalog" className="hover:text-white transition flex items-center gap-1">
+                  <span>Browse Storefront Catalog</span>
+                  <ArrowUpRight size={12} />
+                </a>
               </li>
             </ul>
           </div>
 
-          {/* Official Bank Transfer Info */}
+          {/* Verified Payment Account */}
           <div className="space-y-3">
-            <h4 className="text-xs font-black uppercase tracking-wider text-[#D4AF37]">
-              Payment Verification
-            </h4>
-            <div className="bg-white/5 border border-white/10 p-3.5 rounded-2xl space-y-1.5 text-xs">
-              <span className="text-[10px] text-[#D4AF37] font-bold uppercase">Official Bank Account</span>
-              <p className="font-bold text-white">Sterling Bank</p>
-              <p className="font-mono text-sm font-black text-amber-300">0100286255</p>
-              <p className="text-[11px] text-slate-300 truncate">MARVEL VARIETIES NIG. LTD</p>
+            <h4 className="font-black uppercase tracking-widest text-[#D4AF37] text-[10px]">Payment Verification</h4>
+            <div className="bg-white/5 border border-white/10 p-4 rounded-2xl space-y-2">
+              <p className="text-[10px] text-slate-400 font-bold uppercase">Official Bank Account</p>
+              <p className="font-bold text-white text-sm">OPay</p>
+              <p className="font-mono text-base font-black text-[#D4AF37] tracking-wider">7062297299</p>
+              <p className="text-[10px] text-slate-300 font-medium">OYELEYE MARVELLOUS</p>
             </div>
           </div>
 
-          {/* Contact & Physical Address */}
+          {/* Contact & Physical Hub */}
           <div className="space-y-3">
-            <h4 className="text-xs font-black uppercase tracking-wider text-[#D4AF37]">
-              Contact & Dispatch Hub
-            </h4>
-            <div className="space-y-2 text-xs text-slate-300">
-              <div className="flex items-start gap-2">
-                <MapPin size={16} className="text-[#D4AF37] shrink-0 mt-0.5" />
-                <span>23, Golden Plaza, Opp. Filling Station, Lagos State, Nigeria</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Phone size={15} className="text-[#D4AF37] shrink-0" />
-                <span className="font-mono font-bold text-white">+234 814 687 5777</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock size={15} className="text-[#D4AF37] shrink-0" />
+            <h4 className="font-black uppercase tracking-widest text-[#D4AF37] text-[10px]">Contact & Dispatch Hub</h4>
+            <ul className="space-y-2.5 text-slate-400 text-[11px]">
+              <li className="flex items-start gap-2">
+                <MapPin size={15} className="text-[#D4AF37] shrink-0 mt-0.5" />
+                <span>3 Olanipekun Street, Opposite Akiode Health Centre, Ojodu Berger, Lagos State</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <Phone size={14} className="text-[#D4AF37] shrink-0" />
+                <a href="tel:07062297299" className="hover:text-white transition font-mono">+234 706 229 7299</a>
+              </li>
+              <li className="flex items-center gap-2">
+                <MessageCircle size={14} className="text-[#25D366] shrink-0" />
+                <a 
+                  href="https://wa.me/2347062297299?text=Hello%20Marvel%20Varieties" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="hover:text-[#25D366] transition font-bold"
+                >
+                  WhatsApp: 07062297299
+                </a>
+              </li>
+              <li className="flex items-center gap-2">
+                <Clock size={14} className="text-[#D4AF37] shrink-0" />
                 <span>Mon – Sat: 8:00 AM – 6:00 PM</span>
-              </div>
-            </div>
+              </li>
+            </ul>
           </div>
 
         </div>
 
-        {/* Bottom Bar */}
-        <div className="border-t border-white/10 pt-6 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 gap-4">
+        <div className="pt-8 mt-8 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-500">
           <p>© {new Date().getFullYear()} Marvel Varieties. All rights reserved.</p>
           <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1 text-emerald-400 font-semibold">
-              <CheckCircle2 size={13} /> Direct Transfer Verified
-            </span>
+            <span>Secure Direct Bank Settlement</span>
             <span>•</span>
-            <span className="flex items-center gap-1 text-[#D4AF37] font-semibold">
-              <Truck size={13} /> Nationwide Delivery
-            </span>
+            <span>Fast Nationwide Logistics</span>
           </div>
         </div>
-
       </div>
     </footer>
   );
