@@ -1,42 +1,43 @@
+// app/account/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Navbar } from '@/components/ui/Navbar';
 import { Footer } from '@/components/ui/Footer';
-import { OrderCountdown } from '@/components/ui/OrderCountdown';
-import { loginUserAction, registerUserAction, getCustomerOrdersAction } from '@/lib/actions';
+import { 
+  loginUserAction, 
+  registerUserAction, 
+  getCustomerOrdersAction 
+} from '@/lib/actions';
 import { 
   User, 
-  Package, 
-  Phone, 
   Mail, 
+  Phone, 
   Lock, 
+  ShieldCheck, 
+  Package, 
+  ArrowRight, 
   LogOut, 
+  ShoppingBag,
   ExternalLink,
-  Loader2,
-  Calendar,
-  Building2,
-  ShieldCheck,
-  Clock,
-  ChevronRight
+  Layers
 } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 export default function AccountPage() {
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   const [user, setUser] = useState<any | null>(null);
-  const [customerOrders, setCustomerOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Form input state
-  const [form, setForm] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    password: '',
-  });
+  // Form inputs
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPhone, setRegPhone] = useState('');
+  const [regPassword, setRegPassword] = useState('');
 
   useEffect(() => {
     const saved = localStorage.getItem('marvel_user');
@@ -44,108 +45,115 @@ export default function AccountPage() {
       try {
         const parsed = JSON.parse(saved);
         setUser(parsed);
-        loadOrders(parsed.phone);
-      } catch (e) {
-        localStorage.removeItem('marvel_user');
-      }
+        loadCustomerOrders(parsed.phone || parsed.email);
+      } catch (e) {}
     }
   }, []);
 
-  const loadOrders = async (phone: string) => {
-    setLoading(true);
-    const orders = await getCustomerOrdersAction(phone);
-    setCustomerOrders(orders || []);
-    setLoading(false);
+  const loadCustomerOrders = async (phoneOrEmail: string) => {
+    const res = await getCustomerOrdersAction(phoneOrEmail);
+    setOrders(res || []);
   };
 
-  const handleAuthSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg('');
     setLoading(true);
+    setErrorMsg('');
 
-    if (authMode === 'register') {
-      const res = await registerUserAction({
-        fullName: form.fullName,
-        email: form.email,
-        phone: form.phone,
-        password: form.password,
-      });
-
-      if (res.success && res.user) {
-        setUser(res.user);
-        localStorage.setItem('marvel_user', JSON.stringify(res.user));
-        if (res.user.role === 'admin') {
-          sessionStorage.setItem('marvel_admin_session', 'true');
-        }
-        await loadOrders(res.user.phone);
-      } else {
-        setErrorMsg(res.error || 'Failed to register account');
-      }
+    const res = await loginUserAction(identifier, password);
+    if (res.success && res.user) {
+      localStorage.setItem('marvel_user', JSON.stringify(res.user));
+      setUser(res.user);
+      loadCustomerOrders(res.user.phone || res.user.email);
     } else {
-      const res = await loginUserAction(form.email || form.phone, form.password);
-      if (res.success && res.user) {
-        setUser(res.user);
-        localStorage.setItem('marvel_user', JSON.stringify(res.user));
-        if (res.user.role === 'admin') {
-          sessionStorage.setItem('marvel_admin_session', 'true');
-        }
-        await loadOrders(res.user.phone);
-      } else {
-        setErrorMsg(res.error || 'Invalid credentials');
-      }
+      setErrorMsg(res.error || 'Invalid credentials.');
     }
     setLoading(false);
   };
 
-  const handleLogout = () => {
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg('');
+
+    const res = await registerUserAction({
+      fullName,
+      email: regEmail,
+      phone: regPhone,
+      password: regPassword,
+    });
+
+    if (res.success && res.user) {
+      localStorage.setItem('marvel_user', JSON.stringify(res.user));
+      setUser(res.user);
+      loadCustomerOrders(res.user.phone || res.user.email);
+    } else {
+      setErrorMsg(res.error || 'Failed to create account.');
+    }
+    setLoading(false);
+  };
+
+  const handleSignOut = () => {
     localStorage.removeItem('marvel_user');
     sessionStorage.removeItem('marvel_admin_session');
     setUser(null);
-    setCustomerOrders([]);
+    setOrders([]);
+    setIdentifier('');
+    setPassword('');
   };
 
+  const isSuperAdmin = user?.role === 'admin';
+  const isStaffAdmin = user?.role === 'editor';
+  const hasAdminAccess = isSuperAdmin || isStaffAdmin;
+
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col justify-between pb-16 lg:pb-0">
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col justify-between">
       <div>
         <Navbar />
 
-        <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
-          
-          {/* USER LOGGED IN VIEW */}
+        <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
           {user ? (
             <div className="space-y-6">
-              
-              {/* Profile Card */}
-              <div className="bg-gradient-to-br from-[#0B1B3D] via-[#142752] to-slate-950 p-6 sm:p-8 rounded-3xl text-white shadow-xl flex flex-col sm:flex-row items-center sm:items-start justify-between gap-6">
-                <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
-                  <div className="h-16 w-16 rounded-2xl bg-[#D4AF37]/20 border-2 border-[#D4AF37] flex items-center justify-center text-[#D4AF37]">
+              {/* Account Hero Card */}
+              <div className="bg-gradient-to-r from-[#0B1B3D] via-[#142752] to-slate-950 p-6 sm:p-8 rounded-3xl text-white shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="h-16 w-16 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center text-[#D4AF37] shrink-0">
                     <User size={30} />
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-[#D4AF37] tracking-wider">
-                      {user.role === 'admin' ? 'Store Administrator' : 'Verified Customer'}
-                    </span>
-                    <h1 className="text-2xl font-black">{user.fullName}</h1>
-                    <p className="text-xs text-slate-300 mt-0.5">{user.email} • {user.phone}</p>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full ${
+                        isSuperAdmin 
+                          ? 'bg-[#D4AF37] text-[#0B1B3D]' 
+                          : isStaffAdmin 
+                          ? 'bg-blue-500 text-white' 
+                          : 'bg-white/10 text-slate-300'
+                      }`}>
+                        {isSuperAdmin ? '👑 Super Administrator' : isStaffAdmin ? '🛡️ Staff Product Manager' : 'Verified Customer'}
+                      </span>
+                    </div>
+                    <h2 className="text-xl sm:text-2xl font-black mt-1 text-white">{user.fullName}</h2>
+                    <p className="text-xs text-slate-300 font-mono mt-0.5">
+                      {user.email} • {user.phone}
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  {/* ADMIN CONTROL BUTTON (ONLY FOR ADMIN ROLE) */}
-                  {user.role === 'admin' && (
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  {hasAdminAccess && (
                     <Link
                       href="/admin"
-                      className="bg-[#D4AF37] text-[#0B1B3D] text-xs font-black px-4 py-2.5 rounded-xl hover:bg-[#E8C766] transition flex items-center gap-1.5 shadow-md"
+                      className="flex-1 sm:flex-initial bg-[#D4AF37] hover:bg-[#E8C766] text-[#0B1B3D] font-black text-xs px-4 py-2.5 rounded-xl shadow-md transition flex items-center justify-center gap-1.5"
                     >
-                      <span>Control Center</span>
-                      <ExternalLink size={14} />
+                      <Layers size={15} />
+                      <span>Control Center ↗</span>
                     </Link>
                   )}
                   <button
-                    onClick={handleLogout}
-                    className="bg-white/10 hover:bg-white/20 text-xs font-bold px-3.5 py-2.5 rounded-xl border border-white/20 transition flex items-center gap-1 cursor-pointer"
+                    onClick={handleSignOut}
+                    className="flex-1 sm:flex-initial bg-white/10 hover:bg-white/20 text-white font-bold text-xs px-4 py-2.5 rounded-xl border border-white/10 transition flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    <LogOut size={14} />
+                    <LogOut size={15} />
                     <span>Sign Out</span>
                   </button>
                 </div>
@@ -153,58 +161,39 @@ export default function AccountPage() {
 
               {/* Order History */}
               <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <h2 className="text-lg font-black text-[#0B1B3D] flex items-center gap-2">
-                    <Package size={20} className="text-[#D4AF37]" />
-                    My Order History
-                  </h2>
-                  <Link href="/track" className="text-xs text-[#0B1B3D] font-bold hover:underline">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                  <h3 className="font-black text-base text-[#0B1B3D] flex items-center gap-2">
+                    <Package size={18} className="text-[#D4AF37]" /> My Order History
+                  </h3>
+                  <Link href="/track" className="text-xs font-bold text-slate-500 hover:text-[#0B1B3D]">
                     Track by Ref →
                   </Link>
                 </div>
 
-                {loading ? (
-                  <div className="py-8 flex justify-center items-center gap-2 text-xs text-slate-400">
-                    <Loader2 size={18} className="animate-spin text-[#0B1B3D]" /> Loading your orders...
-                  </div>
-                ) : customerOrders.length === 0 ? (
-                  <div className="text-center py-8 space-y-2">
-                    <Package size={32} className="mx-auto text-slate-300" />
-                    <p className="text-sm font-bold text-slate-700">No orders placed yet</p>
-                    <p className="text-xs text-slate-400">Orders placed with phone {user.phone} will appear here automatically.</p>
+                {orders.length === 0 ? (
+                  <div className="py-12 text-center space-y-2">
+                    <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
+                      <ShoppingBag size={22} />
+                    </div>
+                    <p className="text-xs font-bold text-slate-700">No orders placed yet</p>
+                    <p className="text-[11px] text-slate-400">
+                      Orders placed with phone {user.phone} will appear here automatically.
+                    </p>
                   </div>
                 ) : (
-                  <div className="divide-y divide-slate-100 text-xs">
-                    {customerOrders.map((order) => (
-                      <div key={order.id} className="py-4 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                        <div className="space-y-1.5">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-mono font-black text-[#0B1B3D] text-sm">{order.orderReference}</span>
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                                order.status === 'pending_verification'
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : order.status === 'confirmed'
-                                  ? 'bg-blue-100 text-blue-800'
-                                  : order.status === 'dispatched'
-                                  ? 'bg-purple-100 text-purple-800'
-                                  : 'bg-emerald-100 text-emerald-800'
-                              }`}
-                            >
-                              {order.status.replace('_', ' ')}
-                            </span>
-                          </div>
-                          
-                          {/* Real-time 5-Hour Payment Timer */}
-                          <OrderCountdown createdAt={order.createdAt} status={order.status} />
-
-                          <p className="text-slate-500">{order.deliveryAddress}, {order.deliveryState}</p>
+                  <div className="space-y-3">
+                    {orders.map((o) => (
+                      <div key={o.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200/60 flex items-center justify-between">
+                        <div>
+                          <p className="font-mono font-bold text-xs text-[#0B1B3D]">{o.orderReference}</p>
+                          <p className="text-[11px] text-slate-500 mt-0.5">Total: ₦{o.totalAmount?.toLocaleString()}</p>
                         </div>
-
-                        <div className="text-left sm:text-right space-y-1">
-                          <p className="font-black text-slate-900 text-base">₦{order.totalAmount?.toLocaleString()}</p>
-                          <Link href="/track" className="text-[#0B1B3D] font-bold text-[11px] hover:underline inline-flex items-center gap-0.5">
-                            Live Tracking Details <ChevronRight size={12} />
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] font-bold uppercase px-2.5 py-1 rounded-full bg-slate-200 text-slate-700">
+                            {o.status.replace('_', ' ')}
+                          </span>
+                          <Link href={`/track?ref=${o.orderReference}`} className="p-2 rounded-xl bg-white text-[#0B1B3D] hover:bg-slate-100 transition shadow-sm">
+                            <ArrowRight size={14} />
                           </Link>
                         </div>
                       </div>
@@ -212,132 +201,136 @@ export default function AccountPage() {
                   </div>
                 )}
               </div>
-
             </div>
           ) : (
-            
-            /* GUEST / AUTHENTICATION FORM */
-            <div className="max-w-md mx-auto bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xl space-y-6">
-              
-              {/* Toggle Mode */}
-              <div className="flex bg-slate-100 p-1 rounded-2xl">
+            /* Sign In / Register Card */
+            <div className="max-w-md mx-auto bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-sm space-y-6">
+              <div className="flex bg-slate-100 p-1 rounded-2xl text-xs font-bold">
                 <button
-                  type="button"
-                  onClick={() => { setAuthMode('login'); setErrorMsg(''); }}
-                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                    authMode === 'login' ? 'bg-[#0B1B3D] text-white shadow-md' : 'text-slate-600 hover:text-slate-900'
+                  onClick={() => { setActiveTab('login'); setErrorMsg(''); }}
+                  className={`flex-1 py-2.5 rounded-xl transition cursor-pointer ${
+                    activeTab === 'login' ? 'bg-[#0B1B3D] text-white shadow-sm' : 'text-slate-600'
                   }`}
                 >
                   Sign In
                 </button>
                 <button
-                  type="button"
-                  onClick={() => { setAuthMode('register'); setErrorMsg(''); }}
-                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                    authMode === 'register' ? 'bg-[#0B1B3D] text-white shadow-md' : 'text-slate-600 hover:text-slate-900'
+                  onClick={() => { setActiveTab('register'); setErrorMsg(''); }}
+                  className={`flex-1 py-2.5 rounded-xl transition cursor-pointer ${
+                    activeTab === 'register' ? 'bg-[#0B1B3D] text-white shadow-sm' : 'text-slate-600'
                   }`}
                 >
                   Create Account
                 </button>
               </div>
 
-              <div className="text-center space-y-1">
-                <h2 className="text-xl font-black text-[#0B1B3D]">
-                  {authMode === 'login' ? 'Welcome Back' : 'Create Your Account'}
-                </h2>
-                <p className="text-xs text-slate-400">
-                  {authMode === 'login' 
-                    ? 'Sign in to view your orders and update account details' 
-                    : 'Register to manage orders and track dispatches seamlessly'}
-                </p>
-              </div>
-
               {errorMsg && (
-                <div className="bg-red-50 text-red-600 border border-red-200 text-xs p-3 rounded-xl font-medium">
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 font-bold">
                   {errorMsg}
                 </div>
               )}
 
-              <form onSubmit={handleAuthSubmit} className="space-y-3.5 text-xs">
-                {authMode === 'register' && (
+              {activeTab === 'login' ? (
+                <form onSubmit={handleLogin} className="space-y-4 text-xs">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Full Name *</label>
+                    <label className="font-bold text-slate-700 block mb-1">Email Address or Phone Number *</label>
                     <div className="relative">
                       <input
                         type="text"
                         required
-                        placeholder="e.g. Samuel Adeleke"
-                        value={form.fullName}
-                        onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                        placeholder="e.g. editor@marvelvarieties.com"
+                        value={identifier}
+                        onChange={(e) => setIdentifier(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-[#0B1B3D]"
                       />
-                      <User className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
+                      <Mail className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
                     </div>
                   </div>
-                )}
 
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">
-                    {authMode === 'login' ? 'Email Address or Phone Number *' : 'Email Address *'}
-                  </label>
-                  <div className="relative">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Password *</label>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        required
+                        placeholder="••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-[#0B1B3D]"
+                      />
+                      <Lock className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-[#0B1B3D] hover:bg-[#142752] text-white font-bold py-3.5 rounded-xl shadow-md transition disabled:opacity-50 cursor-pointer"
+                  >
+                    {loading ? 'Authenticating...' : 'Sign In to Account'}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleRegister} className="space-y-3.5 text-xs">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Full Name *</label>
                     <input
                       type="text"
                       required
-                      placeholder="name@example.com or 0814..."
-                      value={form.email}
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-[#0B1B3D]"
+                      placeholder="e.g. Staff Manager"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
                     />
-                    <Mail className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
                   </div>
-                </div>
 
-                {authMode === 'register' && (
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Phone Number (For Order Tracking) *</label>
-                    <div className="relative">
-                      <input
-                        type="tel"
-                        required
-                        placeholder="08146875777"
-                        value={form.phone}
-                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-[#0B1B3D]"
-                      />
-                      <Phone className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
-                    </div>
+                    <label className="font-bold text-slate-700 block mb-1">Email Address *</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="staff@marvelvarieties.com"
+                      value={regEmail}
+                      onChange={(e) => setRegEmail(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
+                    />
                   </div>
-                )}
 
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Password *</label>
-                  <div className="relative">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Phone Number *</label>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="07062297299"
+                      value={regPhone}
+                      onChange={(e) => setRegPhone(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Password *</label>
                     <input
                       type="password"
                       required
-                      placeholder="••••••••"
-                      value={form.password}
-                      onChange={(e) => setForm({ ...form, password: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-[#0B1B3D]"
+                      placeholder="••••"
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
                     />
-                    <Lock className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
                   </div>
-                </div>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-[#0B1B3D] hover:bg-[#142752] text-white font-bold py-3.5 rounded-xl shadow-md transition disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
-                >
-                  {loading && <Loader2 size={16} className="animate-spin" />}
-                  <span>{authMode === 'login' ? 'Sign In to Account' : 'Register Account'}</span>
-                </button>
-              </form>
-
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-[#0B1B3D] hover:bg-[#142752] text-white font-bold py-3.5 rounded-xl shadow-md transition disabled:opacity-50 cursor-pointer"
+                  >
+                    {loading ? 'Creating Account...' : 'Register Account'}
+                  </button>
+                </form>
+              )}
             </div>
           )}
-
         </main>
       </div>
 
