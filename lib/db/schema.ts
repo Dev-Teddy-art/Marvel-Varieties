@@ -20,7 +20,7 @@ export const products = pgTable('products', {
   imageUrl: text('image_url').notNull(),
   images: jsonb('images').$type<string[]>().default([]),
   inStock: boolean('in_stock').default(true),
-  stockQuantity: integer('stock_quantity').default(10), // Real-time countdown
+  stockQuantity: integer('stock_quantity').default(10), // Live product stock count
   isFeatured: boolean('is_featured').default(false),
   createdAt: timestamp('created_at').defaultNow(),
 });
@@ -39,7 +39,7 @@ export const orders = pgTable('orders', {
   isDropship: boolean('is_dropship').default(false),
   totalAmount: integer('total_amount').notNull(),
   receiptUrl: text('receipt_url'),
-  status: text('status').notNull().default('pending_verification'), // 'pending_verification' | 'confirmed' | 'processing' | 'dispatched' | 'delivered'
+  status: text('status').notNull().default('pending_verification'),
   items: jsonb('items').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 });

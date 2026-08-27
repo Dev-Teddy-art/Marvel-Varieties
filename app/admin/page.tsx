@@ -7,12 +7,12 @@ import Image from 'next/image';
 import { Footer } from '@/components/ui/Footer';
 import { 
   addProductAction, 
-  updateProductAction,
+  updateProductAction, 
   getProductsAction, 
   deleteProductAction, 
   getOrdersAction, 
-  updateOrderStatusAction,
-  deleteOrderAction
+  updateOrderStatusAction, 
+  deleteOrderAction 
 } from '@/lib/actions';
 import { 
   LayoutDashboard, 
@@ -20,8 +20,8 @@ import {
   PackageCheck, 
   Plus, 
   Trash2, 
-  Edit3,
-  Star,
+  Edit3, 
+  Star, 
   Eye, 
   X, 
   Lock, 
@@ -30,12 +30,10 @@ import {
   Search, 
   TrendingUp, 
   Clock, 
-  ArrowLeft,
-  UploadCloud,
-  ChevronRight,
-  Boxes,
-  ShieldCheck,
-  Building2
+  ArrowLeft, 
+  UploadCloud, 
+  ChevronRight, 
+  Boxes 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -85,7 +83,6 @@ export default function AdminDashboardPage() {
   });
 
   useEffect(() => {
-    // 1. Check logged-in user from localStorage (bypasses PIN screen if role is admin or editor)
     const savedUser = localStorage.getItem('marvel_user');
     const sessionAuth = sessionStorage.getItem('marvel_admin_session');
 
@@ -100,7 +97,6 @@ export default function AdminDashboardPage() {
       } catch (e) {}
     }
 
-    // 2. Check active PIN session
     if (sessionAuth === 'super_admin') {
       setCurrentUser({ role: 'admin', fullName: 'Super Administrator' });
       fetchDashboardData();
@@ -127,15 +123,12 @@ export default function AdminDashboardPage() {
     e.preventDefault();
     const cleanPin = pinInput.trim();
 
-    // Super Admin: Accepts 24687, 9983, or 1234
     if (cleanPin === '24687' || cleanPin === '9983' || cleanPin === '1234') {
       sessionStorage.setItem('marvel_admin_session', 'super_admin');
       setCurrentUser({ role: 'admin', fullName: 'Super Administrator' });
       setPinError(false);
       fetchDashboardData();
-    } 
-    // Staff / Editor PIN: 5544
-    else if (cleanPin === '5544') {
+    } else if (cleanPin === '5544') {
       sessionStorage.setItem('marvel_admin_session', 'staff_admin');
       setCurrentUser({ role: 'editor', fullName: 'Staff Product Manager' });
       setPinError(false);
@@ -198,19 +191,20 @@ export default function AdminDashboardPage() {
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!productForm.title || !productForm.price || productPreviews.length === 0) {
-      alert('Please select at least 1 photo and fill in title & price.');
+      alert('Please provide photos, title, and price.');
       return;
     }
 
     setIsSubmittingProduct(true);
+    const count = parseInt(productForm.stockQuantity, 10);
     const payload = {
       title: productForm.title,
       category: productForm.category,
       price: parseInt(productForm.price, 10),
-      stockQuantity: parseInt(productForm.stockQuantity, 10) || 0,
+      stockQuantity: isNaN(count) ? 0 : count,
       description: productForm.description,
       images: productPreviews,
-      inStock: productForm.inStock,
+      inStock: (isNaN(count) ? 0 : count) > 0,
       isFeatured: productForm.isFeatured,
     };
 
@@ -226,7 +220,7 @@ export default function AdminDashboardPage() {
   };
 
   const handleDeleteProduct = async (id: string) => {
-    if (confirm('Are you sure you want to delete this product?')) {
+    if (confirm('Are you sure you want to remove this product?')) {
       await deleteProductAction(id);
       await fetchDashboardData();
     }
@@ -268,7 +262,6 @@ export default function AdminDashboardPage() {
     return productsList.filter((p) => productCategoryFilter === 'ALL' || p.category === productCategoryFilter);
   }, [productsList, productCategoryFilter]);
 
-  // UN-AUTHENTICATED: Show PIN Prompt
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-[#070F22] flex flex-col items-center justify-center p-4">
@@ -283,10 +276,10 @@ export default function AdminDashboardPage() {
 
           <div>
             <span className="text-[10px] font-bold uppercase tracking-widest text-[#D4AF37] bg-[#0B1B3D] px-3.5 py-1 rounded-full inline-block">
-              Marvel Control Center
+              Marvel Varieties
             </span>
             <h1 className="text-2xl font-black text-[#0B1B3D] pt-2">Admin Portal</h1>
-            <p className="text-xs text-slate-400 mt-1">Enter your password or access PIN</p>
+            <p className="text-xs text-slate-400 mt-1">Enter password or staff access PIN</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
@@ -306,7 +299,7 @@ export default function AdminDashboardPage() {
               <KeyRound className="absolute left-4 top-4 text-slate-400" size={18} />
             </div>
 
-            {pinError && <p className="text-xs font-bold text-red-500">Invalid PIN or Password. Try again.</p>}
+            {pinError && <p className="text-xs font-bold text-red-500">Invalid PIN or Password.</p>}
 
             <button
               type="submit"
@@ -368,7 +361,7 @@ export default function AdminDashboardPage() {
         <aside className="lg:col-span-3 bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm space-y-2 sticky top-20">
           <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">Navigation</div>
 
-          {/* Super Admin Financial KPI Tab */}
+          {/* Super Admin-Only KPIs Overview */}
           {isSuperAdmin && (
             <button
               onClick={() => setCurrentView('overview')}
@@ -429,7 +422,7 @@ export default function AdminDashboardPage() {
                     <TrendingUp size={16} className="text-emerald-600" />
                   </div>
                   <h3 className="text-2xl font-black text-[#0B1B3D]">₦{metrics.totalRevenue.toLocaleString()}</h3>
-                  <p className="text-[11px] text-slate-400">All recorded orders</p>
+                  <p className="text-[11px] text-slate-400">All recorded customer orders</p>
                 </div>
 
                 <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm space-y-2">
@@ -438,7 +431,7 @@ export default function AdminDashboardPage() {
                     <Clock size={16} className="text-amber-600" />
                   </div>
                   <h3 className="text-2xl font-black text-amber-600">{metrics.pendingSlips}</h3>
-                  <p className="text-[11px] text-slate-400">Awaiting verification</p>
+                  <p className="text-[11px] text-slate-400">Awaiting bank verification</p>
                 </div>
 
                 <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm space-y-2">
@@ -447,7 +440,7 @@ export default function AdminDashboardPage() {
                     <Boxes size={16} className="text-purple-600" />
                   </div>
                   <h3 className="text-2xl font-black text-[#0B1B3D]">{productsList.length}</h3>
-                  <p className="text-[11px] text-slate-400">Items in catalog</p>
+                  <p className="text-[11px] text-slate-400">Items currently listed</p>
                 </div>
               </div>
             </div>
@@ -459,7 +452,7 @@ export default function AdminDashboardPage() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
                 <div>
                   <h3 className="text-xl font-black text-[#0B1B3D]">Customer Orders & Slips</h3>
-                  <p className="text-xs text-slate-400">Inspect transfer receipts and update delivery status</p>
+                  <p className="text-xs text-slate-400">Inspect transfer receipts and update delivery progress</p>
                 </div>
 
                 <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-2xl text-[11px] font-bold">
@@ -615,8 +608,10 @@ export default function AdminDashboardPage() {
                         <span className="absolute top-2 left-2 bg-[#0B1B3D]/80 backdrop-blur-md text-[#D4AF37] text-[9px] uppercase font-bold px-2 py-0.5 rounded-full">
                           {p.category}
                         </span>
-                        <span className="absolute bottom-2 left-2 bg-emerald-600/90 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
-                          {p.stockQuantity ?? 10} In Stock
+                        <span className={`absolute bottom-2 left-2 text-white text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                          (p.stockQuantity ?? 0) > 5 ? 'bg-emerald-600/90' : (p.stockQuantity ?? 0) > 0 ? 'bg-amber-600/90' : 'bg-red-600/90'
+                        }`}>
+                          {p.stockQuantity ?? 0} In Stock
                         </span>
                       </div>
                       <div>
@@ -627,8 +622,8 @@ export default function AdminDashboardPage() {
                     </div>
 
                     <div className="flex items-center justify-between pt-2 border-t border-slate-200/50">
-                      <span className={`text-[10px] font-bold ${p.inStock ? 'text-emerald-600' : 'text-red-500'}`}>
-                        {p.inStock ? '● Active' : '○ Out of Stock'}
+                      <span className={`text-[10px] font-bold ${(p.stockQuantity ?? 0) > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {(p.stockQuantity ?? 0) > 0 ? '● Active' : '○ Out of Stock'}
                       </span>
                       <div className="flex items-center gap-1">
                         <button
@@ -718,7 +713,7 @@ export default function AdminDashboardPage() {
                   <label className="font-bold text-slate-700 block mb-1">Product Detailed Description</label>
                   <textarea
                     rows={3}
-                    placeholder="Describe material, specifications, sizing, warranties, or usage guidelines..."
+                    placeholder="Describe specifications, material, sizing, warranties..."
                     value={productForm.description}
                     onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
@@ -749,16 +744,30 @@ export default function AdminDashboardPage() {
                   </div>
 
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Stock Count *</label>
+                    <label className="font-bold text-slate-700 block mb-1">Stock Left (Units) *</label>
                     <input
                       type="number"
                       required
+                      min="0"
                       placeholder="10"
                       value={productForm.stockQuantity}
                       onChange={(e) => setProductForm({ ...productForm, stockQuantity: e.target.value })}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none"
                     />
                   </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="featCheck"
+                    checked={productForm.isFeatured}
+                    onChange={(e) => setProductForm({ ...productForm, isFeatured: e.target.checked })}
+                    className="h-4 w-4 rounded border-slate-300 text-[#0B1B3D] cursor-pointer"
+                  />
+                  <label htmlFor="featCheck" className="text-xs font-semibold text-slate-700 flex items-center gap-1 cursor-pointer">
+                    <Star size={13} className="text-[#D4AF37] fill-[#D4AF37]" /> Feature on Homepage Spotlight
+                  </label>
                 </div>
 
                 <div className="flex gap-2 pt-2">
@@ -774,7 +783,7 @@ export default function AdminDashboardPage() {
                     disabled={isSubmittingProduct}
                     className="w-2/3 bg-[#0B1B3D] hover:bg-[#142752] text-white font-bold py-3.5 rounded-xl shadow-md cursor-pointer"
                   >
-                    {isSubmittingProduct ? 'Saving...' : 'Save Changes'}
+                    {isSubmittingProduct ? 'Saving...' : 'Save Product'}
                   </button>
                 </div>
               </form>

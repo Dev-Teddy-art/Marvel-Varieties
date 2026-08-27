@@ -7,7 +7,7 @@ import { desc, eq, or } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 
 // ==========================================
-// 1. PRODUCT ACTIONS
+// 1. PRODUCT ACTIONS (WITH STOCK QUANTITY COUNT)
 // ==========================================
 
 export async function getProductsAction() {
@@ -26,7 +26,7 @@ export async function addProductAction(formData: {
   description?: string;
   images: string[];
   inStock: boolean;
-  stockQuantity?: number;
+  stockQuantity: number;
   isFeatured?: boolean;
 }) {
   try {
@@ -34,6 +34,8 @@ export async function addProductAction(formData: {
     const allImages = formData.images && formData.images.length > 0 
       ? formData.images 
       : ['/MARVEL VARIETIES.png'];
+
+    const quantity = Number(formData.stockQuantity) >= 0 ? Number(formData.stockQuantity) : 10;
 
     await db.insert(products).values({
       id,
@@ -43,8 +45,8 @@ export async function addProductAction(formData: {
       description: formData.description || '',
       imageUrl: allImages[0],
       images: allImages,
-      inStock: formData.inStock,
-      stockQuantity: formData.stockQuantity ?? 10,
+      inStock: quantity > 0,
+      stockQuantity: quantity,
       isFeatured: formData.isFeatured || false,
     });
 
@@ -64,13 +66,15 @@ export async function updateProductAction(id: string, formData: {
   description?: string;
   images: string[];
   inStock: boolean;
-  stockQuantity?: number;
+  stockQuantity: number;
   isFeatured: boolean;
 }) {
   try {
     const allImages = formData.images && formData.images.length > 0 
       ? formData.images 
       : ['/MARVEL VARIETIES.png'];
+
+    const quantity = Number(formData.stockQuantity) >= 0 ? Number(formData.stockQuantity) : 0;
 
     await db.update(products).set({
       title: formData.title,
@@ -79,8 +83,8 @@ export async function updateProductAction(id: string, formData: {
       description: formData.description || '',
       imageUrl: allImages[0],
       images: allImages,
-      inStock: formData.inStock,
-      stockQuantity: formData.stockQuantity ?? 10,
+      inStock: quantity > 0,
+      stockQuantity: quantity,
       isFeatured: formData.isFeatured,
     }).where(eq(products.id, id));
 
@@ -105,7 +109,7 @@ export async function deleteProductAction(id: string) {
 }
 
 // ==========================================
-// 2. ORDER ACTIONS (WITH OPTIONAL DROPSHIP DUAL ADDRESS)
+// 2. ORDER ACTIONS
 // ==========================================
 
 export async function getOrdersAction() {
@@ -185,31 +189,8 @@ export async function deleteOrderAction(id: string) {
   }
 }
 
-export async function searchOrderAction(query: string) {
-  try {
-    const cleaned = query.trim();
-    const cleanPhone = query.replace(/[^0-9+]/g, '');
-
-    const results = await db
-      .select()
-      .from(orders)
-      .where(
-        or(
-          eq(orders.orderReference, cleaned),
-          eq(orders.customerPhone, cleaned),
-          eq(orders.customerPhone, cleanPhone)
-        )
-      )
-      .limit(1);
-
-    return results[0] || null;
-  } catch (error) {
-    return null;
-  }
-}
-
 // ==========================================
-// 3. AUTH & USER ACTIONS
+// 3. AUTHENTICATION ACTIONS
 // ==========================================
 
 export async function registerUserAction(data: {
