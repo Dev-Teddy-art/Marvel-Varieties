@@ -7,7 +7,7 @@ import { desc, eq, or } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 
 // ==========================================
-// 1. PRODUCT ACTIONS (WITH STOCK QUANTITY COUNT)
+// 1. PRODUCT ACTIONS (STOCK & DESCRIPTIONS)
 // ==========================================
 
 export async function getProductsAction() {
@@ -109,7 +109,7 @@ export async function deleteProductAction(id: string) {
 }
 
 // ==========================================
-// 2. ORDER ACTIONS
+// 2. ORDER ACTIONS (CREATION, STATUS & SEARCH)
 // ==========================================
 
 export async function getOrdersAction() {
@@ -189,8 +189,52 @@ export async function deleteOrderAction(id: string) {
   }
 }
 
+export async function searchOrderAction(query: string) {
+  try {
+    const cleaned = query.trim();
+    const cleanPhone = query.replace(/[^0-9+]/g, '');
+
+    const results = await db
+      .select()
+      .from(orders)
+      .where(
+        or(
+          eq(orders.orderReference, cleaned),
+          eq(orders.customerPhone, cleaned),
+          eq(orders.customerPhone, cleanPhone)
+        )
+      )
+      .limit(1);
+
+    return results[0] || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function getCustomerOrdersAction(phoneOrEmail: string) {
+  try {
+    const cleaned = phoneOrEmail.trim().toLowerCase();
+    const cleanPhone = phoneOrEmail.replace(/[^0-9+]/g, '');
+
+    return await db
+      .select()
+      .from(orders)
+      .where(
+        or(
+          eq(orders.customerPhone, cleaned),
+          eq(orders.customerPhone, cleanPhone),
+          eq(orders.customerEmail, cleaned)
+        )
+      )
+      .orderBy(desc(orders.createdAt));
+  } catch (error) {
+    return [];
+  }
+}
+
 // ==========================================
-// 3. AUTHENTICATION ACTIONS
+// 3. AUTH & USER ACTIONS
 // ==========================================
 
 export async function registerUserAction(data: {
@@ -276,26 +320,5 @@ export async function loginUserAction(identifier: string, pass: string) {
     };
   } catch (error: any) {
     return { success: false, error: error?.message || 'Database connection error' };
-  }
-}
-
-export async function getCustomerOrdersAction(phoneOrEmail: string) {
-  try {
-    const cleaned = phoneOrEmail.trim().toLowerCase();
-    const cleanPhone = phoneOrEmail.replace(/[^0-9+]/g, '');
-
-    return await db
-      .select()
-      .from(orders)
-      .where(
-        or(
-          eq(orders.customerPhone, cleaned),
-          eq(orders.customerPhone, cleanPhone),
-          eq(orders.customerEmail, cleaned)
-        )
-      )
-      .orderBy(desc(orders.createdAt));
-  } catch (error) {
-    return [];
   }
 }
