@@ -1,3 +1,4 @@
+// app/admin/page.tsx
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -29,11 +30,12 @@ import {
   Search, 
   TrendingUp, 
   Clock, 
-  Truck, 
   ArrowLeft,
   UploadCloud,
   ChevronRight,
-  Layers
+  Boxes,
+  ShieldCheck,
+  Building2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -51,11 +53,11 @@ const CATEGORIES = [
 ];
 
 export default function AdminDashboardPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any | null>(null);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
 
-  const [currentView, setCurrentView] = useState<'overview' | 'orders' | 'products'>('overview');
+  const [currentView, setCurrentView] = useState<'overview' | 'orders' | 'products'>('orders');
   const [ordersList, setOrdersList] = useState<any[]>([]);
   const [productsList, setProductsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,7 +67,7 @@ export default function AdminDashboardPage() {
   const [orderStatusFilter, setOrderStatusFilter] = useState('ALL');
   const [productCategoryFilter, setProductCategoryFilter] = useState('ALL');
 
-  // Modal State (Add or Edit)
+  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [previewReceipt, setPreviewReceipt] = useState<string | null>(null);
@@ -76,15 +78,34 @@ export default function AdminDashboardPage() {
     title: '',
     category: CATEGORIES[0],
     price: '',
+    stockQuantity: '10',
     description: '',
     inStock: true,
     isFeatured: false,
   });
 
   useEffect(() => {
+    // 1. Check logged-in user from localStorage (bypasses PIN screen if role is admin or editor)
+    const savedUser = localStorage.getItem('marvel_user');
     const sessionAuth = sessionStorage.getItem('marvel_admin_session');
-    if (sessionAuth === 'true') {
-      setIsAuthenticated(true);
+
+    if (savedUser) {
+      try {
+        const u = JSON.parse(savedUser);
+        if (u.role === 'admin' || u.role === 'editor') {
+          setCurrentUser(u);
+          fetchDashboardData();
+          return;
+        }
+      } catch (e) {}
+    }
+
+    // 2. Check active PIN session
+    if (sessionAuth === 'super_admin') {
+      setCurrentUser({ role: 'admin', fullName: 'Super Administrator' });
+      fetchDashboardData();
+    } else if (sessionAuth === 'staff_admin') {
+      setCurrentUser({ role: 'editor', fullName: 'Staff Product Manager' });
       fetchDashboardData();
     } else {
       setLoading(false);
@@ -104,9 +125,19 @@ export default function AdminDashboardPage() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (pinInput === '9983' || pinInput === '1234') {
-      sessionStorage.setItem('marvel_admin_session', 'true');
-      setIsAuthenticated(true);
+    const cleanPin = pinInput.trim();
+
+    // Super Admin: Accepts 24687, 9983, or 1234
+    if (cleanPin === '24687' || cleanPin === '9983' || cleanPin === '1234') {
+      sessionStorage.setItem('marvel_admin_session', 'super_admin');
+      setCurrentUser({ role: 'admin', fullName: 'Super Administrator' });
+      setPinError(false);
+      fetchDashboardData();
+    } 
+    // Staff / Editor PIN: 5544
+    else if (cleanPin === '5544') {
+      sessionStorage.setItem('marvel_admin_session', 'staff_admin');
+      setCurrentUser({ role: 'editor', fullName: 'Staff Product Manager' });
       setPinError(false);
       fetchDashboardData();
     } else {
@@ -116,7 +147,8 @@ export default function AdminDashboardPage() {
 
   const handleLogout = () => {
     sessionStorage.removeItem('marvel_admin_session');
-    setIsAuthenticated(false);
+    localStorage.removeItem('marvel_user');
+    setCurrentUser(null);
     setPinInput('');
   };
 
@@ -126,6 +158,7 @@ export default function AdminDashboardPage() {
       title: '',
       category: CATEGORIES[0],
       price: '',
+      stockQuantity: '10',
       description: '',
       inStock: true,
       isFeatured: false,
@@ -140,6 +173,7 @@ export default function AdminDashboardPage() {
       title: p.title,
       category: p.category,
       price: p.price.toString(),
+      stockQuantity: (p.stockQuantity ?? 10).toString(),
       description: p.description || '',
       inStock: p.inStock,
       isFeatured: p.isFeatured || false,
@@ -152,18 +186,13 @@ export default function AdminDashboardPage() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const filesArray = Array.from(files);
-    filesArray.forEach((file) => {
+    Array.from(files).forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         setProductPreviews((prev) => [...prev, reader.result as string]);
       };
       reader.readAsDataURL(file);
     });
-  };
-
-  const handleRemoveUploadedImage = (indexToRemove: number) => {
-    setProductPreviews((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
@@ -174,47 +203,30 @@ export default function AdminDashboardPage() {
     }
 
     setIsSubmittingProduct(true);
+    const payload = {
+      title: productForm.title,
+      category: productForm.category,
+      price: parseInt(productForm.price, 10),
+      stockQuantity: parseInt(productForm.stockQuantity, 10) || 0,
+      description: productForm.description,
+      images: productPreviews,
+      inStock: productForm.inStock,
+      isFeatured: productForm.isFeatured,
+    };
 
     if (editingProductId) {
-      const res = await updateProductAction(editingProductId, {
-        title: productForm.title,
-        category: productForm.category,
-        price: parseInt(productForm.price, 10),
-        description: productForm.description,
-        images: productPreviews,
-        inStock: productForm.inStock,
-        isFeatured: productForm.isFeatured,
-      });
-
-      if (res.success) {
-        setIsModalOpen(false);
-        await fetchDashboardData();
-      } else {
-        alert('Failed to update product.');
-      }
+      await updateProductAction(editingProductId, payload);
     } else {
-      const res = await addProductAction({
-        title: productForm.title,
-        category: productForm.category,
-        price: parseInt(productForm.price, 10),
-        description: productForm.description,
-        images: productPreviews,
-        inStock: productForm.inStock,
-        isFeatured: productForm.isFeatured,
-      });
-
-      if (res.success) {
-        setIsModalOpen(false);
-        await fetchDashboardData();
-      } else {
-        alert('Failed to save product.');
-      }
+      await addProductAction(payload);
     }
+
+    setIsModalOpen(false);
+    await fetchDashboardData();
     setIsSubmittingProduct(false);
   };
 
   const handleDeleteProduct = async (id: string) => {
-    if (confirm('Are you sure you want to remove this product from the live catalog?')) {
+    if (confirm('Are you sure you want to delete this product?')) {
       await deleteProductAction(id);
       await fetchDashboardData();
     }
@@ -226,13 +238,9 @@ export default function AdminDashboardPage() {
   };
 
   const handleDeleteOrder = async (orderId: string, reference: string) => {
-    if (confirm(`Are you sure you want to permanently delete order ${reference}?`)) {
-      const res = await deleteOrderAction(orderId);
-      if (res.success) {
-        await fetchDashboardData();
-      } else {
-        alert('Failed to delete order.');
-      }
+    if (confirm(`Permanently delete order ${reference}?`)) {
+      await deleteOrderAction(orderId);
+      await fetchDashboardData();
     }
   };
 
@@ -240,10 +248,9 @@ export default function AdminDashboardPage() {
     const totalRevenue = ordersList.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0);
     const pendingSlips = ordersList.filter((o) => o.status === 'pending_verification').length;
     const confirmedOrders = ordersList.filter((o) => o.status === 'confirmed' || o.status === 'dispatched').length;
-    const featuredCount = productsList.filter((p) => p.isFeatured).length;
 
-    return { totalRevenue, pendingSlips, confirmedOrders, featuredCount };
-  }, [ordersList, productsList]);
+    return { totalRevenue, pendingSlips, confirmedOrders };
+  }, [ordersList]);
 
   const filteredOrders = useMemo(() => {
     return ordersList.filter((o) => {
@@ -258,12 +265,11 @@ export default function AdminDashboardPage() {
   }, [ordersList, orderSearchQuery, orderStatusFilter]);
 
   const filteredProducts = useMemo(() => {
-    return productsList.filter((p) => {
-      return productCategoryFilter === 'ALL' || p.category === productCategoryFilter;
-    });
+    return productsList.filter((p) => productCategoryFilter === 'ALL' || p.category === productCategoryFilter);
   }, [productsList, productCategoryFilter]);
 
-  if (!isAuthenticated) {
+  // UN-AUTHENTICATED: Show PIN Prompt
+  if (!currentUser) {
     return (
       <div className="min-h-screen bg-[#070F22] flex flex-col items-center justify-center p-4">
         <motion.div
@@ -280,7 +286,7 @@ export default function AdminDashboardPage() {
               Marvel Control Center
             </span>
             <h1 className="text-2xl font-black text-[#0B1B3D] pt-2">Admin Portal</h1>
-            <p className="text-xs text-slate-400 mt-1">Enter your PIN to manage the catalog & orders</p>
+            <p className="text-xs text-slate-400 mt-1">Enter your password or access PIN</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
@@ -288,19 +294,19 @@ export default function AdminDashboardPage() {
               <input
                 type="password"
                 required
-                maxLength={8}
-                placeholder="Enter PIN"
+                maxLength={10}
+                placeholder="Enter PIN / Password"
                 value={pinInput}
                 onChange={(e) => {
                   setPinInput(e.target.value);
                   setPinError(false);
                 }}
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3.5 pl-11 pr-4 text-center tracking-widest font-mono text-lg font-black focus:outline-none focus:border-[#0B1B3D]"
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3.5 pl-11 pr-4 text-center tracking-widest font-mono text-base font-black focus:outline-none focus:border-[#0B1B3D]"
               />
               <KeyRound className="absolute left-4 top-4 text-slate-400" size={18} />
             </div>
 
-            {pinError && <p className="text-xs font-bold text-red-500">Invalid Security PIN. Try again.</p>}
+            {pinError && <p className="text-xs font-bold text-red-500">Invalid PIN or Password. Try again.</p>}
 
             <button
               type="submit"
@@ -318,9 +324,11 @@ export default function AdminDashboardPage() {
     );
   }
 
+  const isSuperAdmin = currentUser.role === 'admin';
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col justify-between">
-      {/* Topbar */}
+      {/* Top Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -334,6 +342,9 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <span className="text-xs font-bold px-3 py-1 rounded-full bg-slate-100 text-[#0B1B3D]">
+              {isSuperAdmin ? '👑 Super Admin' : '🛡️ Limited Staff Access'}
+            </span>
             <button
               onClick={handleOpenAddModal}
               className="bg-[#D4AF37] hover:bg-[#E8C766] text-[#0B1B3D] text-xs font-black px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-sm transition cursor-pointer"
@@ -343,7 +354,7 @@ export default function AdminDashboardPage() {
             <button
               onClick={handleLogout}
               className="p-2 text-slate-400 hover:text-red-500 transition rounded-xl hover:bg-slate-100 cursor-pointer"
-              title="Lock & Logout"
+              title="Logout"
             >
               <LogOut size={18} />
             </button>
@@ -351,25 +362,29 @@ export default function AdminDashboardPage() {
         </div>
       </header>
 
-      {/* Main Container */}
+      {/* Main Grid Layout */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Sidebar */}
+        {/* Navigation Sidebar */}
         <aside className="lg:col-span-3 bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm space-y-2 sticky top-20">
-          <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">Control Hub</div>
+          <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">Navigation</div>
 
-          <button
-            onClick={() => setCurrentView('overview')}
-            className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition cursor-pointer ${
-              currentView === 'overview' ? 'bg-[#0B1B3D] text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <LayoutDashboard size={18} className={currentView === 'overview' ? 'text-[#D4AF37]' : 'text-slate-400'} />
-              <span>Overview & KPIs</span>
-            </div>
-            <ChevronRight size={14} className={currentView === 'overview' ? 'text-[#D4AF37]' : 'text-slate-300'} />
-          </button>
+          {/* Super Admin Financial KPI Tab */}
+          {isSuperAdmin && (
+            <button
+              onClick={() => setCurrentView('overview')}
+              className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition cursor-pointer ${
+                currentView === 'overview' ? 'bg-[#0B1B3D] text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <LayoutDashboard size={18} className={currentView === 'overview' ? 'text-[#D4AF37]' : 'text-slate-400'} />
+                <span>Financial Overview</span>
+              </div>
+              <ChevronRight size={14} />
+            </button>
+          )}
 
+          {/* Orders & Slips Verification */}
           <button
             onClick={() => setCurrentView('orders')}
             className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition cursor-pointer ${
@@ -378,7 +393,7 @@ export default function AdminDashboardPage() {
           >
             <div className="flex items-center gap-3">
               <PackageCheck size={18} className={currentView === 'orders' ? 'text-[#D4AF37]' : 'text-slate-400'} />
-              <span>Orders & Transfers</span>
+              <span>Orders & Slips</span>
             </div>
             {metrics.pendingSlips > 0 && (
               <span className="bg-amber-500 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full">
@@ -387,6 +402,7 @@ export default function AdminDashboardPage() {
             )}
           </button>
 
+          {/* Product Inventory Management */}
           <button
             onClick={() => setCurrentView('products')}
             className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition cursor-pointer ${
@@ -401,18 +417,16 @@ export default function AdminDashboardPage() {
           </button>
         </aside>
 
-        {/* Right Dynamic Pane */}
+        {/* Content Pane */}
         <main className="lg:col-span-9 space-y-6">
-          {/* VIEW 1: OVERVIEW */}
-          {currentView === 'overview' && (
+          {/* VIEW 1: SUPER ADMIN FINANCIAL OVERVIEW */}
+          {currentView === 'overview' && isSuperAdmin && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm space-y-2">
                   <div className="flex justify-between items-center text-slate-400 text-xs font-bold">
                     <span>Total Revenue</span>
-                    <div className="h-8 w-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                      <TrendingUp size={16} />
-                    </div>
+                    <TrendingUp size={16} className="text-emerald-600" />
                   </div>
                   <h3 className="text-2xl font-black text-[#0B1B3D]">₦{metrics.totalRevenue.toLocaleString()}</h3>
                   <p className="text-[11px] text-slate-400">All recorded orders</p>
@@ -421,9 +435,7 @@ export default function AdminDashboardPage() {
                 <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm space-y-2">
                   <div className="flex justify-between items-center text-slate-400 text-xs font-bold">
                     <span>Pending Proofs</span>
-                    <div className="h-8 w-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                      <Clock size={16} />
-                    </div>
+                    <Clock size={16} className="text-amber-600" />
                   </div>
                   <h3 className="text-2xl font-black text-amber-600">{metrics.pendingSlips}</h3>
                   <p className="text-[11px] text-slate-400">Awaiting verification</p>
@@ -431,73 +443,23 @@ export default function AdminDashboardPage() {
 
                 <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm space-y-2">
                   <div className="flex justify-between items-center text-slate-400 text-xs font-bold">
-                    <span>Featured Items</span>
-                    <div className="h-8 w-8 rounded-xl bg-amber-50 text-[#D4AF37] flex items-center justify-center">
-                      <Star size={16} />
-                    </div>
-                  </div>
-                  <h3 className="text-2xl font-black text-[#0B1B3D]">{metrics.featuredCount}</h3>
-                  <p className="text-[11px] text-slate-400">Promoted on homepage</p>
-                </div>
-
-                <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm space-y-2">
-                  <div className="flex justify-between items-center text-slate-400 text-xs font-bold">
                     <span>Total Products</span>
-                    <div className="h-8 w-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                      <Layers size={16} />
-                    </div>
+                    <Boxes size={16} className="text-purple-600" />
                   </div>
                   <h3 className="text-2xl font-black text-[#0B1B3D]">{productsList.length}</h3>
-                  <p className="text-[11px] text-slate-400">Catalog size</p>
+                  <p className="text-[11px] text-slate-400">Items in catalog</p>
                 </div>
-              </div>
-
-              {/* Recent Orders Overview */}
-              <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                  <div>
-                    <h3 className="text-base font-black text-[#0B1B3D]">Recent Orders</h3>
-                    <p className="text-xs text-slate-400">Latest bank transfer checkouts</p>
-                  </div>
-                  <button
-                    onClick={() => setCurrentView('orders')}
-                    className="text-xs font-bold text-[#0B1B3D] hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    View All <ChevronRight size={14} />
-                  </button>
-                </div>
-
-                {ordersList.length === 0 ? (
-                  <p className="text-xs text-slate-400 py-6 text-center">No orders recorded yet.</p>
-                ) : (
-                  <div className="divide-y divide-slate-100 text-xs">
-                    {ordersList.slice(0, 5).map((order) => (
-                      <div key={order.id} className="py-3 flex items-center justify-between gap-4">
-                        <div>
-                          <p className="font-mono font-bold text-[#0B1B3D]">{order.orderReference}</p>
-                          <p className="text-slate-500 font-medium">{order.customerName} ({order.customerPhone})</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-black text-slate-900">₦{order.totalAmount?.toLocaleString()}</p>
-                          <span className="text-[10px] font-bold text-amber-600 uppercase">
-                            {order.status.replace('_', ' ')}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
           )}
 
-          {/* VIEW 2: ORDERS (WITH PERMANENT DELETE BUTTON) */}
+          {/* VIEW 2: ORDERS, SLIPS & DISPATCH */}
           {currentView === 'orders' && (
             <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
                 <div>
                   <h3 className="text-xl font-black text-[#0B1B3D]">Customer Orders & Slips</h3>
-                  <p className="text-xs text-slate-400">Inspect transfer receipts, update shipping, or remove test records</p>
+                  <p className="text-xs text-slate-400">Inspect transfer receipts and update delivery status</p>
                 </div>
 
                 <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-2xl text-[11px] font-bold">
@@ -531,8 +493,8 @@ export default function AdminDashboardPage() {
                   <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 uppercase font-bold text-[10px] tracking-wider">
                     <tr>
                       <th className="p-3.5">Reference</th>
-                      <th className="p-3.5">Customer & Phone</th>
-                      <th className="p-3.5">Destination</th>
+                      <th className="p-3.5">Customer</th>
+                      <th className="p-3.5">Delivery Address</th>
                       <th className="p-3.5">Total</th>
                       <th className="p-3.5">Payment Slip</th>
                       <th className="p-3.5">Status</th>
@@ -542,7 +504,7 @@ export default function AdminDashboardPage() {
                   <tbody className="divide-y divide-slate-100">
                     {filteredOrders.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="p-8 text-center text-slate-400">No matching orders found.</td>
+                        <td colSpan={7} className="p-8 text-center text-slate-400">No orders found.</td>
                       </tr>
                     ) : (
                       filteredOrders.map((order) => (
@@ -553,8 +515,8 @@ export default function AdminDashboardPage() {
                             <p className="text-[11px] text-slate-400 font-mono">{order.customerPhone}</p>
                           </td>
                           <td className="p-3.5 text-slate-600 font-medium">
-                            <p>{order.deliveryState}</p>
-                            <p className="text-[10px] text-slate-400 truncate max-w-[150px]">{order.deliveryAddress}</p>
+                            <p className="font-bold text-[#0B1B3D]">{order.deliveryState}</p>
+                            <p className="text-[10px] text-slate-400 truncate max-w-[140px]">{order.deliveryAddress || 'Pickup'}</p>
                           </td>
                           <td className="p-3.5 font-black text-slate-900">₦{order.totalAmount?.toLocaleString()}</td>
                           <td className="p-3.5">
@@ -571,7 +533,7 @@ export default function AdminDashboardPage() {
                           </td>
                           <td className="p-3.5">
                             <span
-                              className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                              className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
                                 order.status === 'pending_verification'
                                   ? 'bg-amber-100 text-amber-800'
                                   : order.status === 'confirmed'
@@ -598,11 +560,10 @@ export default function AdminDashboardPage() {
                                 <option value="delivered">Delivered</option>
                               </select>
 
-                              {/* PERMANENT ORDER DELETE BUTTON */}
                               <button
                                 onClick={() => handleDeleteOrder(order.id, order.orderReference)}
                                 className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition cursor-pointer"
-                                title="Delete Order Record"
+                                title="Delete Order"
                               >
                                 <Trash2 size={15} />
                               </button>
@@ -617,13 +578,13 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* VIEW 3: INVENTORY */}
+          {/* VIEW 3: INVENTORY, DESCRIPTION & STOCK COUNTING */}
           {currentView === 'products' && (
             <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
                 <div>
-                  <h3 className="text-xl font-black text-[#0B1B3D]">Live Store Inventory</h3>
-                  <p className="text-xs text-slate-400">Click &apos;Edit&apos; to update photos, stock, prices, or feature badges</p>
+                  <h3 className="text-xl font-black text-[#0B1B3D]">Store Inventory & Stock Count</h3>
+                  <p className="text-xs text-slate-400">Manage photos, descriptions, quantity remaining, and spotlight badges</p>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -640,7 +601,7 @@ export default function AdminDashboardPage() {
                     onClick={handleOpenAddModal}
                     className="bg-[#0B1B3D] hover:bg-[#142752] text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition cursor-pointer"
                   >
-                    <Plus size={14} /> Add New
+                    <Plus size={14} /> Add Product
                   </button>
                 </div>
               </div>
@@ -654,39 +615,33 @@ export default function AdminDashboardPage() {
                         <span className="absolute top-2 left-2 bg-[#0B1B3D]/80 backdrop-blur-md text-[#D4AF37] text-[9px] uppercase font-bold px-2 py-0.5 rounded-full">
                           {p.category}
                         </span>
-                        {p.isFeatured && (
-                          <span className="absolute top-2 right-2 bg-[#D4AF37] text-[#0B1B3D] text-[9px] uppercase font-black px-2 py-0.5 rounded-full flex items-center gap-1 shadow">
-                            <Star size={10} className="fill-[#0B1B3D]" /> Featured
-                          </span>
-                        )}
-                        {p.images && p.images.length > 1 && (
-                          <span className="absolute bottom-2 right-2 bg-black/60 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
-                            {p.images.length} photos
-                          </span>
-                        )}
+                        <span className="absolute bottom-2 left-2 bg-emerald-600/90 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
+                          {p.stockQuantity ?? 10} In Stock
+                        </span>
                       </div>
                       <div>
-                        <h4 className="font-bold text-xs text-slate-900 line-clamp-2">{p.title}</h4>
-                        <p className="text-sm font-black text-[#0B1B3D] mt-1">₦{p.price?.toLocaleString()}</p>
+                        <h4 className="font-bold text-xs text-slate-900 line-clamp-1">{p.title}</h4>
+                        <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{p.description || 'No description added.'}</p>
+                        <p className="text-sm font-black text-[#0B1B3D] mt-1.5">₦{p.price?.toLocaleString()}</p>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between pt-2 border-t border-slate-200/50">
                       <span className={`text-[10px] font-bold ${p.inStock ? 'text-emerald-600' : 'text-red-500'}`}>
-                        {p.inStock ? '● In Stock' : '○ Out of Stock'}
+                        {p.inStock ? '● Active' : '○ Out of Stock'}
                       </span>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleOpenEditModal(p)}
                           className="p-1.5 text-slate-500 hover:text-[#0B1B3D] hover:bg-slate-200/60 rounded-lg transition cursor-pointer"
-                          title="Edit Product Details & Stock"
+                          title="Edit Product"
                         >
                           <Edit3 size={15} />
                         </button>
                         <button
                           onClick={() => handleDeleteProduct(p.id)}
                           className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition cursor-pointer"
-                          title="Delete product"
+                          title="Delete Product"
                         >
                           <Trash2 size={15} />
                         </button>
@@ -700,7 +655,7 @@ export default function AdminDashboardPage() {
         </main>
       </div>
 
-      {/* MODAL: ADD / EDIT PRODUCT */}
+      {/* MODAL: ADD / EDIT PRODUCT WITH DESCRIPTION & STOCK COUNT */}
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -713,7 +668,7 @@ export default function AdminDashboardPage() {
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h3 className="font-black text-lg text-[#0B1B3D] flex items-center gap-2">
                   {editingProductId ? <Edit3 size={20} className="text-[#D4AF37]" /> : <Plus size={20} className="text-[#D4AF37]" />}
-                  {editingProductId ? 'Edit Product Details' : 'Add New Product'}
+                  {editingProductId ? 'Edit Product & Stock' : 'Add New Product'}
                 </h3>
                 <button onClick={() => setIsModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-800 rounded-lg cursor-pointer">
                   <X size={20} />
@@ -721,23 +676,10 @@ export default function AdminDashboardPage() {
               </div>
 
               <form onSubmit={handleSaveProduct} className="space-y-4 text-xs">
+                {/* Image Upload */}
                 <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="font-bold text-slate-700 block">
-                      Product Photos {productPreviews.length > 0 && `(${productPreviews.length} selected)`} *
-                    </label>
-                    {productPreviews.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setProductPreviews([])}
-                        className="text-[11px] text-red-500 font-bold hover:underline cursor-pointer"
-                      >
-                        Clear All
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="border-2 border-dashed border-slate-200 hover:border-[#0B1B3D] transition rounded-2xl p-4 text-center cursor-pointer relative bg-slate-50">
+                  <label className="font-bold text-slate-700 block">Product Photos *</label>
+                  <div className="border-2 border-dashed border-slate-200 rounded-2xl p-4 text-center cursor-pointer relative bg-slate-50">
                     <input
                       type="file"
                       multiple
@@ -745,36 +687,15 @@ export default function AdminDashboardPage() {
                       onChange={handleMultipleImagesSelect}
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                     />
-                    <div className="space-y-1">
-                      <div className="h-10 w-10 bg-slate-100 text-[#0B1B3D] rounded-full flex items-center justify-center mx-auto">
-                        <UploadCloud size={20} />
-                      </div>
-                      <p className="text-xs font-bold text-slate-700">Click to upload 1 or more photos</p>
-                      <p className="text-[10px] text-slate-400">Select multiple items to build an interactive carousel</p>
-                    </div>
+                    <UploadCloud size={22} className="mx-auto text-[#0B1B3D]" />
+                    <p className="text-xs font-bold text-slate-700 mt-1">Upload Product Photos</p>
                   </div>
 
                   {productPreviews.length > 0 && (
-                    <div className="grid grid-cols-4 gap-2 pt-2">
+                    <div className="grid grid-cols-4 gap-2 pt-1">
                       {productPreviews.map((src, index) => (
-                        <div key={index} className="relative h-20 rounded-xl overflow-hidden border border-slate-200 group bg-slate-100">
+                        <div key={index} className="relative h-16 rounded-xl overflow-hidden border border-slate-200">
                           <img src={src} alt="Preview" className="h-full w-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveUploadedImage(index);
-                            }}
-                            className="absolute top-1 right-1 h-5 w-5 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px] font-bold shadow hover:bg-red-700 cursor-pointer z-20"
-                            title="Remove photo"
-                          >
-                            ×
-                          </button>
-                          {index === 0 && (
-                            <span className="absolute bottom-1 left-1 bg-[#0B1B3D] text-[#D4AF37] text-[8px] font-bold px-1.5 py-0.5 rounded shadow">
-                              Cover
-                            </span>
-                          )}
                         </div>
                       ))}
                     </div>
@@ -786,63 +707,57 @@ export default function AdminDashboardPage() {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Ashake Luxury Leather Footwear"
+                    placeholder="e.g. Electric Blender 2.0L"
                     value={productForm.title}
                     onChange={(e) => setProductForm({ ...productForm, title: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Product Detailed Description</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Describe material, specifications, sizing, warranties, or usage guidelines..."
+                    value={productForm.description}
+                    onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="font-bold text-slate-700 block mb-1">Category *</label>
                     <select
                       value={productForm.category}
                       onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D] font-semibold"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none"
                     >
                       {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
 
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Price in ₦ *</label>
+                    <label className="font-bold text-slate-700 block mb-1">Price (₦) *</label>
                     <input
                       type="number"
                       required
-                      placeholder="e.g. 6500"
                       value={productForm.price}
                       onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none"
                     />
                   </div>
-                </div>
 
-                <div className="space-y-2 pt-2 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
-                  <div className="flex items-center gap-2">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Stock Count *</label>
                     <input
-                      type="checkbox"
-                      id="stockCheck"
-                      checked={productForm.inStock}
-                      onChange={(e) => setProductForm({ ...productForm, inStock: e.target.checked })}
-                      className="h-4 w-4 rounded border-slate-300 text-[#0B1B3D] cursor-pointer"
+                      type="number"
+                      required
+                      placeholder="10"
+                      value={productForm.stockQuantity}
+                      onChange={(e) => setProductForm({ ...productForm, stockQuantity: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none"
                     />
-                    <label htmlFor="stockCheck" className="font-semibold text-slate-800 cursor-pointer">
-                      In Stock (Ready for immediate purchase)
-                    </label>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="featureCheck"
-                      checked={productForm.isFeatured}
-                      onChange={(e) => setProductForm({ ...productForm, isFeatured: e.target.checked })}
-                      className="h-4 w-4 rounded border-slate-300 text-[#0B1B3D] cursor-pointer"
-                    />
-                    <label htmlFor="featureCheck" className="font-semibold text-[#0B1B3D] flex items-center gap-1.5 cursor-pointer">
-                      <Star size={13} className="text-[#D4AF37] fill-[#D4AF37]" /> Feature this product in the Homepage Spotlight
-                    </label>
                   </div>
                 </div>
 
@@ -850,16 +765,16 @@ export default function AdminDashboardPage() {
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 rounded-xl transition cursor-pointer"
+                    className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 rounded-xl cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmittingProduct}
-                    className="w-2/3 bg-[#0B1B3D] hover:bg-[#142752] text-white font-bold py-3.5 rounded-xl transition shadow-md disabled:opacity-50 cursor-pointer"
+                    className="w-2/3 bg-[#0B1B3D] hover:bg-[#142752] text-white font-bold py-3.5 rounded-xl shadow-md cursor-pointer"
                   >
-                    {isSubmittingProduct ? 'Saving...' : editingProductId ? 'Update Product' : 'Save Product'}
+                    {isSubmittingProduct ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </form>
@@ -868,7 +783,7 @@ export default function AdminDashboardPage() {
         )}
       </AnimatePresence>
 
-      {/* MODAL: RECEIPT SLIP */}
+      {/* RECEIPT PREVIEW MODAL */}
       <AnimatePresence>
         {previewReceipt && (
           <div
@@ -883,12 +798,12 @@ export default function AdminDashboardPage() {
               className="bg-white rounded-3xl p-4 max-w-lg w-full relative shadow-2xl space-y-3"
             >
               <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-                <span className="text-xs font-black text-[#0B1B3D]">Payment Proof Screenshot</span>
+                <span className="text-xs font-black text-[#0B1B3D]">Bank Transfer Slip Proof</span>
                 <button onClick={() => setPreviewReceipt(null)} className="p-1 rounded-lg text-slate-400 hover:text-slate-800 cursor-pointer">
                   <X size={20} />
                 </button>
               </div>
-              <div className="max-h-[70vh] overflow-y-auto rounded-2xl border border-slate-100 bg-slate-50 flex items-center justify-center">
+              <div className="max-h-[70vh] overflow-y-auto rounded-2xl bg-slate-50 flex items-center justify-center p-2">
                 <img src={previewReceipt} alt="Bank Slip" className="w-full h-auto object-contain rounded-2xl" />
               </div>
             </motion.div>
