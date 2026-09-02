@@ -2,12 +2,12 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { products, orders, users } from '@/lib/db/schema';
+import { products, orders, users, storeSettings } from '@/lib/db/schema';
 import { desc, eq, or } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 
 // ==========================================
-// 1. PRODUCT ACTIONS (STOCK & DESCRIPTIONS)
+// 1. PRODUCT ACTIONS (STOCK, COLORS & DETAILS)
 // ==========================================
 
 export async function getProductsAction() {
@@ -24,18 +24,20 @@ export async function addProductAction(formData: {
   category: string;
   price: number;
   description?: string;
+  colors?: any[];
   images: string[];
-  inStock: boolean;
-  stockQuantity: number;
+  inStock?: boolean;
+  stockQuantity?: number;
   isFeatured?: boolean;
 }) {
   try {
     const id = `prod_${Date.now()}`;
     const allImages = formData.images && formData.images.length > 0 
       ? formData.images 
-      : ['/MARVEL VARIETIES.png'];
+      : ['/MARVEL_VARIETIES-removebg-preview.png'];
 
     const quantity = Number(formData.stockQuantity) >= 0 ? Number(formData.stockQuantity) : 10;
+    const colorList = Array.isArray(formData.colors) ? formData.colors : [];
 
     await db.insert(products).values({
       id,
@@ -45,6 +47,7 @@ export async function addProductAction(formData: {
       description: formData.description || '',
       imageUrl: allImages[0],
       images: allImages,
+      colors: colorList,
       inStock: quantity > 0,
       stockQuantity: quantity,
       isFeatured: formData.isFeatured || false,
@@ -59,22 +62,27 @@ export async function addProductAction(formData: {
   }
 }
 
-export async function updateProductAction(id: string, formData: {
-  title: string;
-  category: string;
-  price: number;
-  description?: string;
-  images: string[];
-  inStock: boolean;
-  stockQuantity: number;
-  isFeatured: boolean;
-}) {
+export async function updateProductAction(
+  id: string, 
+  formData: {
+    title: string;
+    category: string;
+    price: number;
+    description?: string;
+    colors?: any[];
+    images: string[];
+    inStock?: boolean;
+    stockQuantity?: number;
+    isFeatured?: boolean;
+  }
+) {
   try {
     const allImages = formData.images && formData.images.length > 0 
       ? formData.images 
-      : ['/MARVEL VARIETIES.png'];
+      : ['/MARVEL_VARIETIES-removebg-preview.png'];
 
     const quantity = Number(formData.stockQuantity) >= 0 ? Number(formData.stockQuantity) : 0;
+    const colorList = Array.isArray(formData.colors) ? formData.colors : [];
 
     await db.update(products).set({
       title: formData.title,
@@ -83,9 +91,10 @@ export async function updateProductAction(id: string, formData: {
       description: formData.description || '',
       imageUrl: allImages[0],
       images: allImages,
+      colors: colorList,
       inStock: quantity > 0,
       stockQuantity: quantity,
-      isFeatured: formData.isFeatured,
+      isFeatured: formData.isFeatured ?? false,
     }).where(eq(products.id, id));
 
     revalidatePath('/');
@@ -320,5 +329,79 @@ export async function loginUserAction(identifier: string, pass: string) {
     };
   } catch (error: any) {
     return { success: false, error: error?.message || 'Database connection error' };
+  }
+}
+
+// ==========================================
+// 4. STORE SETTINGS & BANK INFO ACTIONS
+// ==========================================
+
+export async function getStoreSettingsAction() {
+  try {
+    const settings = await db
+      .select()
+      .from(storeSettings)
+      .where(eq(storeSettings.id, 'default_store_settings'))
+      .limit(1);
+
+    if (!settings || settings.length === 0) {
+      const initial = {
+        id: 'default_store_settings',
+        bankName: 'OPay',
+        accountNumber: '7062297299',
+        accountName: 'OYELEYE MARVELLOUS',
+        contactAddress: '3 Olanipekun Street, Opposite Akiode Health Centre, Ojodu Berger, Lagos State',
+        contactPhone: '+234 706 229 7299',
+        whatsappNumber: '07062297299',
+        operatingHours: 'Mon – Sat: 8:00 AM – 6:00 PM',
+      };
+      await db.insert(storeSettings).values(initial);
+      return initial;
+    }
+    return settings[0];
+  } catch (error) {
+    console.error('Failed to get store settings:', error);
+    return {
+      bankName: 'OPay',
+      accountNumber: '7062297299',
+      accountName: 'OYELEYE MARVELLOUS',
+      contactAddress: '3 Olanipekun Street, Opposite Akiode Health Centre, Ojodu Berger, Lagos State',
+      contactPhone: '+234 706 229 7299',
+      whatsappNumber: '07062297299',
+      operatingHours: 'Mon – Sat: 8:00 AM – 6:00 PM',
+    };
+  }
+}
+
+export async function updateStoreSettingsAction(data: {
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  contactAddress: string;
+  contactPhone: string;
+  whatsappNumber: string;
+  operatingHours: string;
+}) {
+  try {
+    await db
+      .insert(storeSettings)
+      .values({
+        id: 'default_store_settings',
+        ...data,
+      })
+      .onConflictDoUpdate({
+        target: storeSettings.id,
+        set: {
+          ...data,
+          updatedAt: new Date(),
+        },
+      });
+
+    revalidatePath('/');
+    revalidatePath('/admin');
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to update store settings:', error);
+    return { success: false, error: 'Database update failed' };
   }
 }

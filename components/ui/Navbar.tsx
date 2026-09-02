@@ -7,38 +7,28 @@ import Image from 'next/image';
 import { useCart } from '@/lib/store/useCart';
 import { 
   ShoppingBag, 
-  User, 
   Search, 
   Menu, 
   X, 
-  Truck, 
-  ChevronRight, 
-  MessageCircle 
+  Sparkles, 
+  User, 
+  Package, 
+  LogOut, 
+  PhoneCall, 
+  HelpCircle,
+  Truck
 } from 'lucide-react';
-
-const CATEGORIES = [
-  'All Products',
-  'Household Items',
-  'Kitchen Items',
-  'Bags & Luggage',
-  'Kiddies',
-  'Sneakers & Footwear',
-  'Health & Beauty',
-  "Women's Fashion",
-  "Men's Fashion",
-  'Gadgets & Accessories',
-];
 
 interface NavbarProps {
   activeCategory?: string;
   onSelectCategory?: (cat: string) => void;
 }
 
-export function Navbar({ activeCategory = 'All Products', onSelectCategory }: NavbarProps) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [user, setUser] = useState<any | null>(null);
+export function Navbar({ activeCategory, onSelectCategory }: NavbarProps) {
   const { items, openCart } = useCart();
-  const cartItemCount = items.reduce((total, item) => total + (item.quantity || 1), 0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const totalItems = items?.length || 0;
+  const [user, setUser] = useState<any | null>(null);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('marvel_user');
@@ -51,174 +41,195 @@ export function Navbar({ activeCategory = 'All Products', onSelectCategory }: Na
     }
   }, []);
 
+  const handleLogout = () => {
+    localStorage.removeItem('marvel_user');
+    setUser(null);
+    window.location.reload();
+  };
+
+  const navCategories = [
+    'All Products',
+    'Household Items',
+    'Kitchen Items',
+    'Bags & Luggage',
+    'Sneakers & Footwear',
+    'Health & Beauty',
+    "Women's Fashion",
+    "Men's Fashion",
+    'Gadgets & Accessories',
+  ];
+
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-slate-200/80 shadow-sm">
+    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
       {/* Top Notification Bar */}
-      <div className="bg-[#0B1B3D] text-slate-300 text-[11px] py-1.5 px-4 hidden sm:block border-b border-white/10">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#D4AF37] animate-pulse"></span>
-            <span>Your One-Stop Destination • Nationwide Delivery</span>
-          </div>
-          <div className="flex items-center gap-4 text-slate-400 font-medium">
-            <Link href="/track" className="hover:text-white transition">Track Order</Link>
-            <span>|</span>
-            <a 
-              href="https://wa.me/2347062297299?text=Hello%20Marvel%20Varieties" 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="hover:text-[#25D366] transition flex items-center gap-1"
-            >
-              <MessageCircle size={12} className="text-[#25D366]" />
-              <span>WhatsApp Support: +234 706 229 7299</span>
-            </a>
-          </div>
+      <div className="bg-[#0B1B3D] text-[#D4AF37] px-4 py-1.5 text-[10px] sm:text-xs font-bold flex justify-between items-center tracking-wider">
+        <div className="flex items-center gap-2">
+          <Sparkles size={12} className="animate-pulse" />
+          <span>Your One-Stop Destination • Nationwide Delivery</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <Link href="/track" className="hover:underline flex items-center gap-1">
+            <Truck size={12} />
+            <span>Track Order</span>
+          </Link>
+          <a 
+            href="https://wa.me/2347062297299" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="hover:underline hidden sm:inline"
+          >
+            WhatsApp Support: +234 706 229 7299
+          </a>
         </div>
       </div>
 
       {/* Main Bar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-20 gap-4">
-          {/* Logo with Transparent Background */}
-          <Link href="/" className="flex items-center gap-2 shrink-0">
-            <div className="relative h-10 w-32 sm:h-12 sm:w-40">
-              <Image 
-                src="/MARVEL_VARIETIES-removebg-preview.png" 
-                alt="Marvel Varieties" 
-                fill 
-                className="object-contain" 
-                priority 
-              />
-            </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
+        {/* Logo with sizes prop added */}
+        <Link href="/" className="flex items-center gap-2 shrink-0">
+          <div className="relative h-10 w-32 sm:h-12 sm:w-40">
+            <Image 
+              src="/MARVEL_VARIETIES-removebg-preview.png" 
+              alt="Marvel Varieties" 
+              fill 
+              sizes="(max-width: 640px) 128px, 160px"
+              className="object-contain" 
+              priority 
+            />
+          </div>
+        </Link>
+
+        {/* Action Controls */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Link
+            href="/track"
+            className="hidden md:flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-[#0B1B3D] bg-slate-100 px-3.5 py-2 rounded-xl transition"
+          >
+            <Truck size={14} className="text-[#D4AF37]" />
+            <span>Track</span>
           </Link>
 
-          {/* Search Box */}
-          <div className="hidden md:flex flex-1 max-w-lg relative">
-            <input
-              type="text"
-              placeholder="Search products, household, kitchen..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-2.5 pl-10 pr-4 text-xs focus:outline-none focus:border-[#0B1B3D] transition"
-            />
-            <Search className="absolute left-3.5 top-3 text-slate-400" size={16} />
-          </div>
-
-          {/* Nav Actions */}
-          <div className="flex items-center gap-2 sm:gap-4">
-            <Link 
-              href="/track" 
-              className="hidden sm:flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-[#0B1B3D] transition p-2 rounded-xl hover:bg-slate-50"
+          {user ? (
+            <div className="relative group">
+              <Link
+                href="/account"
+                className="flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-[#0B1B3D] bg-slate-100 px-3.5 py-2 rounded-xl transition"
+              >
+                <User size={14} className="text-[#0B1B3D]" />
+                <span className="max-w-[80px] truncate">{user.fullName?.split(' ')[0]}</span>
+              </Link>
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="hidden sm:flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-[#0B1B3D] bg-slate-100 px-3.5 py-2 rounded-xl transition"
             >
-              <Truck size={17} />
-              <span>Track</span>
+              <User size={14} />
+              <span>Sign In</span>
             </Link>
+          )}
 
-            <Link 
-              href="/account" 
-              className="flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-[#0B1B3D] transition border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-50"
-            >
-              <User size={16} />
-              <span className="hidden sm:inline">
-                {user ? user.fullName?.split(' ')[0] : 'Sign In'}
+          {/* Cart Bag Trigger */}
+          <button
+            onClick={openCart}
+            className="relative bg-[#0B1B3D] text-[#D4AF37] px-3.5 sm:px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-[#142752] transition shadow cursor-pointer"
+          >
+            <ShoppingBag size={16} />
+            <span className="hidden sm:inline">Bag</span>
+            {totalItems > 0 && (
+              <span className="bg-[#D4AF37] text-[#0B1B3D] text-[10px] font-black h-4 w-4 rounded-full flex items-center justify-center -ml-0.5">
+                {totalItems}
               </span>
-            </Link>
+            )}
+          </button>
 
-            {/* Cart Trigger */}
-            <button
-              onClick={openCart}
-              className="relative bg-[#0B1B3D] text-white p-2.5 sm:px-4 sm:py-2.5 rounded-xl flex items-center gap-2 shadow-md hover:bg-[#142752] transition cursor-pointer"
-            >
-              <ShoppingBag size={18} className="text-[#D4AF37]" />
-              <span className="hidden sm:inline text-xs font-black">Bag</span>
-              {cartItemCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-[#D4AF37] text-[#0B1B3D] text-[10px] font-black h-5 w-5 rounded-full flex items-center justify-center border-2 border-white shadow">
-                  {cartItemCount}
-                </span>
-              )}
-            </button>
-
-            {/* Mobile Menu Toggle */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-slate-600 hover:text-[#0B1B3D] rounded-xl hover:bg-slate-100 transition"
-            >
-              {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
-            </button>
-          </div>
+          {/* Mobile Menu Trigger */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 text-slate-700 lg:hidden rounded-xl hover:bg-slate-100 transition cursor-pointer"
+          >
+            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
         </div>
       </div>
 
-      {/* Category Bar */}
-      <div className="border-t border-slate-100 hidden md:block bg-slate-50/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex items-center gap-1 overflow-x-auto py-2 scrollbar-none text-xs font-bold">
-            {CATEGORIES.map((cat) => {
-              const isActive = activeCategory === cat;
-              return (
-                <button
-                  key={cat}
-                  onClick={() => onSelectCategory && onSelectCategory(cat)}
-                  className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition cursor-pointer ${
-                    isActive
-                      ? 'bg-[#0B1B3D] text-[#D4AF37] shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                  }`}
-                >
-                  {cat}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
+      {/* Category Navigation Bar (Desktop) */}
+      <div className="hidden lg:flex max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-slate-100 overflow-x-auto no-scrollbar py-2.5 gap-2">
+        {navCategories.map((cat) => {
+          const isActive = activeCategory === cat;
+          return (
+            <button
+              key={cat}
+              onClick={() => onSelectCategory && onSelectCategory(cat)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                isActive
+                  ? 'bg-[#0B1B3D] text-[#D4AF37] shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              {cat}
+            </button>
+          );
+        })}
       </div>
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-slate-200 bg-white px-4 py-4 space-y-4 shadow-xl">
-          <div className="space-y-1">
-            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Categories</p>
-            <div className="grid grid-cols-2 gap-1.5 pt-1">
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => {
-                    if (onSelectCategory) onSelectCategory(cat);
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`text-left text-xs p-2 rounded-xl font-bold ${
-                    activeCategory === cat ? 'bg-[#0B1B3D] text-[#D4AF37]' : 'text-slate-600 bg-slate-50'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="border-t border-slate-100 pt-3 space-y-2 text-xs font-bold">
-            <Link 
-              href="/track" 
+        <div className="lg:hidden bg-white border-t border-slate-200 p-4 space-y-4 shadow-xl">
+          <div className="grid grid-cols-2 gap-2">
+            <Link
+              href="/track"
               onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 text-slate-700"
+              className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700"
             >
-              <div className="flex items-center gap-2">
-                <Truck size={16} />
-                <span>Track Order</span>
-              </div>
-              <ChevronRight size={14} />
+              <Truck size={14} className="text-[#0B1B3D]" />
+              <span>Track Orders</span>
             </Link>
 
-            <a 
-              href="https://wa.me/2347062297299?text=Hello%20Marvel%20Varieties"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200"
-            >
-              <div className="flex items-center gap-2">
-                <MessageCircle size={16} className="text-[#25D366]" />
-                <span>WhatsApp Customer Support</span>
-              </div>
-              <ChevronRight size={14} />
-            </a>
+            {user ? (
+              <Link
+                href="/account"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700"
+              >
+                <Package size={14} className="text-[#0B1B3D]" />
+                <span>My Orders</span>
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700"
+              >
+                <User size={14} className="text-[#0B1B3D]" />
+                <span>Sign In / Register</span>
+              </Link>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            <p className="text-[10px] uppercase font-black tracking-wider text-slate-400 px-1">Categories</p>
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {navCategories.map((cat) => {
+                const isActive = activeCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => {
+                      if (onSelectCategory) onSelectCategory(cat);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      isActive
+                        ? 'bg-[#0B1B3D] text-[#D4AF37]'
+                        : 'bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

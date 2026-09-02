@@ -12,7 +12,9 @@ import {
   deleteProductAction, 
   getOrdersAction, 
   updateOrderStatusAction, 
-  deleteOrderAction 
+  deleteOrderAction,
+  getStoreSettingsAction,
+  updateStoreSettingsAction
 } from '@/lib/actions';
 import { 
   LayoutDashboard, 
@@ -33,7 +35,13 @@ import {
   ArrowLeft, 
   UploadCloud, 
   ChevronRight, 
-  Boxes 
+  Boxes,
+  Palette,
+  Camera,
+  Settings,
+  Building2,
+  Phone,
+  Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -50,12 +58,17 @@ const CATEGORIES = [
   'Watches',
 ];
 
+interface ColorVariantItem {
+  name: string;
+  image?: string;
+}
+
 export default function AdminDashboardPage() {
   const [currentUser, setCurrentUser] = useState<any | null>(null);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
 
-  const [currentView, setCurrentView] = useState<'overview' | 'orders' | 'products'>('orders');
+  const [currentView, setCurrentView] = useState<'overview' | 'orders' | 'products' | 'settings'>('products');
   const [ordersList, setOrdersList] = useState<any[]>([]);
   const [productsList, setProductsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,15 +85,33 @@ export default function AdminDashboardPage() {
   const [productPreviews, setProductPreviews] = useState<string[]>([]);
   const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
 
+  // Store Settings State
+  const [settingsForm, setSettingsForm] = useState({
+    bankName: 'OPay',
+    accountNumber: '7062297299',
+    accountName: 'OYELEYE MARVELLOUS',
+    contactAddress: '3 Olanipekun Street, Opposite Akiode Health Centre, Ojodu Berger, Lagos State',
+    contactPhone: '+234 706 229 7299',
+    whatsappNumber: '07062297299',
+    operatingHours: 'Mon – Sat: 8:00 AM – 6:00 PM',
+  });
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [settingsSavedSuccess, setSettingsSavedSuccess] = useState(false);
+
+  // Product Form State
   const [productForm, setProductForm] = useState({
     title: '',
     category: CATEGORIES[0],
     price: '',
     stockQuantity: '10',
     description: '',
+    colors: [] as ColorVariantItem[],
     inStock: true,
     isFeatured: false,
   });
+
+  const [colorNameInput, setColorNameInput] = useState('');
+  const [colorImagePreview, setColorImagePreview] = useState<string>('');
 
   useEffect(() => {
     const savedUser = localStorage.getItem('marvel_user');
@@ -110,12 +141,24 @@ export default function AdminDashboardPage() {
 
   const fetchDashboardData = async () => {
     setLoading(true);
-    const [ordersData, productsData] = await Promise.all([
+    const [ordersData, productsData, storeSettingsData] = await Promise.all([
       getOrdersAction(),
       getProductsAction(),
+      getStoreSettingsAction(),
     ]);
     setOrdersList(ordersData || []);
     setProductsList(productsData || []);
+    if (storeSettingsData) {
+      setSettingsForm({
+        bankName: storeSettingsData.bankName || 'OPay',
+        accountNumber: storeSettingsData.accountNumber || '7062297299',
+        accountName: storeSettingsData.accountName || 'OYELEYE MARVELLOUS',
+        contactAddress: storeSettingsData.contactAddress || '3 Olanipekun Street, Opposite Akiode Health Centre, Ojodu Berger, Lagos State',
+        contactPhone: storeSettingsData.contactPhone || '+234 706 229 7299',
+        whatsappNumber: storeSettingsData.whatsappNumber || '07062297299',
+        operatingHours: storeSettingsData.operatingHours || 'Mon – Sat: 8:00 AM – 6:00 PM',
+      });
+    }
     setLoading(false);
   };
 
@@ -145,6 +188,19 @@ export default function AdminDashboardPage() {
     setPinInput('');
   };
 
+  const handleSaveStoreSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingSettings(true);
+    const res = await updateStoreSettingsAction(settingsForm);
+    if (res.success) {
+      setSettingsSavedSuccess(true);
+      setTimeout(() => setSettingsSavedSuccess(false), 3000);
+    } else {
+      alert('Error updating store settings.');
+    }
+    setIsSavingSettings(false);
+  };
+
   const handleOpenAddModal = () => {
     setEditingProductId(null);
     setProductForm({
@@ -153,26 +209,73 @@ export default function AdminDashboardPage() {
       price: '',
       stockQuantity: '10',
       description: '',
+      colors: [],
       inStock: true,
       isFeatured: false,
     });
+    setColorNameInput('');
+    setColorImagePreview('');
     setProductPreviews([]);
     setIsModalOpen(true);
   };
 
   const handleOpenEditModal = (p: any) => {
     setEditingProductId(p.id);
+    const rawColors = Array.isArray(p.colors) ? p.colors : [];
+    const normalizedColors: ColorVariantItem[] = rawColors.map((c: any) => 
+      typeof c === 'string' ? { name: c, image: p.imageUrl } : c
+    );
+
     setProductForm({
       title: p.title,
       category: p.category,
       price: p.price.toString(),
       stockQuantity: (p.stockQuantity ?? 10).toString(),
       description: p.description || '',
+      colors: normalizedColors,
       inStock: p.inStock,
       isFeatured: p.isFeatured || false,
     });
+    setColorNameInput('');
+    setColorImagePreview('');
     setProductPreviews(p.images && p.images.length > 0 ? p.images : [p.imageUrl]);
     setIsModalOpen(true);
+  };
+
+  const handleColorImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setColorImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAddColorVariant = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const cleanName = colorNameInput.trim();
+    if (!cleanName) {
+      alert('Please enter a color name (e.g. Burgundy, 1B Natural Black)');
+      return;
+    }
+
+    const fallbackImg = colorImagePreview || productPreviews[0] || '/MARVEL_VARIETIES-removebg-preview.png';
+
+    setProductForm((prev) => ({
+      ...prev,
+      colors: [...prev.colors, { name: cleanName, image: fallbackImg }],
+    }));
+
+    setColorNameInput('');
+    setColorImagePreview('');
+  };
+
+  const handleRemoveColor = (indexToRemove: number) => {
+    setProductForm((prev) => ({
+      ...prev,
+      colors: prev.colors.filter((_, idx) => idx !== indexToRemove),
+    }));
   };
 
   const handleMultipleImagesSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -191,7 +294,7 @@ export default function AdminDashboardPage() {
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!productForm.title || !productForm.price || productPreviews.length === 0) {
-      alert('Please provide photos, title, and price.');
+      alert('Please upload main product photos, title, and price.');
       return;
     }
 
@@ -203,20 +306,26 @@ export default function AdminDashboardPage() {
       price: parseInt(productForm.price, 10),
       stockQuantity: isNaN(count) ? 0 : count,
       description: productForm.description,
+      colors: productForm.colors,
       images: productPreviews,
       inStock: (isNaN(count) ? 0 : count) > 0,
       isFeatured: productForm.isFeatured,
     };
 
-    if (editingProductId) {
-      await updateProductAction(editingProductId, payload);
-    } else {
-      await addProductAction(payload);
-    }
+    try {
+      if (editingProductId) {
+        await updateProductAction(editingProductId, payload as any);
+      } else {
+        await addProductAction(payload as any);
+      }
 
-    setIsModalOpen(false);
-    await fetchDashboardData();
-    setIsSubmittingProduct(false);
+      setIsModalOpen(false);
+      await fetchDashboardData();
+    } catch (err) {
+      console.error('Save product error:', err);
+    } finally {
+      setIsSubmittingProduct(false);
+    }
   };
 
   const handleDeleteProduct = async (id: string) => {
@@ -317,12 +426,10 @@ export default function AdminDashboardPage() {
     );
   }
 
-  const isSuperAdmin = currentUser.role === 'admin';
-
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col justify-between">
-      {/* Top Header with Transparent Logo */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+      {/* Top Header */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/" className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-[#0B1B3D] font-bold transition">
@@ -334,6 +441,7 @@ export default function AdminDashboardPage() {
                 src="/MARVEL_VARIETIES-removebg-preview.png" 
                 alt="Marvel Varieties" 
                 fill 
+                sizes="128px"
                 className="object-contain" 
                 priority 
               />
@@ -342,11 +450,11 @@ export default function AdminDashboardPage() {
 
           <div className="flex items-center gap-3">
             <span className="text-xs font-bold px-3 py-1 rounded-full bg-slate-100 text-[#0B1B3D]">
-              {isSuperAdmin ? '👑 Super Admin' : '🛡️ Limited Staff Access'}
+              👑 Super Admin
             </span>
             <button
               onClick={handleOpenAddModal}
-              className="bg-[#D4AF37] hover:bg-[#E8C766] text-[#0B1B3D] text-xs font-black px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+              className="bg-[#D4AF37] hover:bg-[#E8C766] text-[#0B1B3D] text-xs font-black px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-xs transition cursor-pointer"
             >
               <Plus size={16} /> Add Product
             </button>
@@ -361,29 +469,26 @@ export default function AdminDashboardPage() {
         </div>
       </header>
 
-      {/* Main Grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      {/* Main Container - Responsive flex layout that prevents overlapping */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full flex-1 flex flex-col md:flex-row gap-6 items-start">
+        
         {/* Navigation Sidebar */}
-        <aside className="lg:col-span-3 bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm space-y-2 sticky top-20">
+        <aside className="w-full md:w-64 bg-white p-4 rounded-3xl border border-slate-200/80 shadow-xs space-y-2 shrink-0 md:sticky md:top-20 z-10">
           <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">Navigation</div>
 
-          {/* Super Admin Financial KPI Tab */}
-          {isSuperAdmin && (
-            <button
-              onClick={() => setCurrentView('overview')}
-              className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition cursor-pointer ${
-                currentView === 'overview' ? 'bg-[#0B1B3D] text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <LayoutDashboard size={18} className={currentView === 'overview' ? 'text-[#D4AF37]' : 'text-slate-400'} />
-                <span>Financial Overview</span>
-              </div>
-              <ChevronRight size={14} />
-            </button>
-          )}
+          <button
+            onClick={() => setCurrentView('overview')}
+            className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition cursor-pointer ${
+              currentView === 'overview' ? 'bg-[#0B1B3D] text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <LayoutDashboard size={18} className={currentView === 'overview' ? 'text-[#D4AF37]' : 'text-slate-400'} />
+              <span>Financial Overview</span>
+            </div>
+            <ChevronRight size={14} />
+          </button>
 
-          {/* Orders & Slips Verification */}
           <button
             onClick={() => setCurrentView('orders')}
             className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition cursor-pointer ${
@@ -401,7 +506,6 @@ export default function AdminDashboardPage() {
             )}
           </button>
 
-          {/* Product Inventory Management */}
           <button
             onClick={() => setCurrentView('products')}
             className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition cursor-pointer ${
@@ -414,15 +518,166 @@ export default function AdminDashboardPage() {
             </div>
             <span className="text-[11px] text-slate-400 font-semibold">{productsList.length}</span>
           </button>
+
+          <button
+            onClick={() => setCurrentView('settings')}
+            className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition cursor-pointer ${
+              currentView === 'settings' ? 'bg-[#0B1B3D] text-[#D4AF37] shadow-md' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Settings size={18} className={currentView === 'settings' ? 'text-[#D4AF37]' : 'text-slate-400'} />
+              <span>Store & Bank Info</span>
+            </div>
+            <span className="bg-[#D4AF37]/20 text-[#0B1B3D] text-[9px] font-black px-2 py-0.5 rounded-md">Edit</span>
+          </button>
         </aside>
 
-        {/* Content Pane */}
-        <main className="lg:col-span-9 space-y-6">
-          {/* VIEW 1: SUPER ADMIN FINANCIAL OVERVIEW */}
-          {currentView === 'overview' && isSuperAdmin && (
+        {/* Content Area */}
+        <main className="flex-1 w-full min-w-0 space-y-6">
+          {/* VIEW: SETTINGS */}
+          {currentView === 'settings' && (
+            <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
+              <div className="border-b border-slate-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-xl font-black text-[#0B1B3D]">Edit Bank Account & Store Details</h3>
+                  <p className="text-xs text-slate-400">Everything changed here updates the footer & checkout bank details live</p>
+                </div>
+                {settingsSavedSuccess && (
+                  <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1">
+                    <Check size={14} /> Saved & Published Live!
+                  </span>
+                )}
+              </div>
+
+              <form onSubmit={handleSaveStoreSettings} className="space-y-6 text-xs">
+                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#0B1B3D] flex items-center gap-2">
+                    <Building2 size={16} className="text-[#D4AF37]" /> Payment Verification Box (Footer & Checkout)
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Official Bank Name</label>
+                      <input
+                        type="text"
+                        required
+                        value={settingsForm.bankName}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, bankName: e.target.value })}
+                        className="w-full bg-white border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
+                        placeholder="e.g. OPay, Moniepoint, Zenith"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Account Number</label>
+                      <input
+                        type="text"
+                        required
+                        value={settingsForm.accountNumber}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, accountNumber: e.target.value })}
+                        className="w-full bg-white border border-slate-200 rounded-xl p-3 font-mono font-bold focus:outline-none focus:border-[#0B1B3D]"
+                        placeholder="e.g. 7062297299"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Account Name</label>
+                      <input
+                        type="text"
+                        required
+                        value={settingsForm.accountName}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, accountName: e.target.value })}
+                        className="w-full bg-white border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
+                        placeholder="e.g. OYELEYE MARVELLOUS"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#0B1B3D] flex items-center gap-2">
+                    <Phone size={16} className="text-[#D4AF37]" /> Contact & Dispatch Hub Details
+                  </h4>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Physical Dispatch Hub Address</label>
+                      <input
+                        type="text"
+                        required
+                        value={settingsForm.contactAddress}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, contactAddress: e.target.value })}
+                        className="w-full bg-white border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
+                        placeholder="e.g. 3 Olanipekun Street, Opposite Akiode Health Centre..."
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Customer Care Phone</label>
+                        <input
+                          type="text"
+                          required
+                          value={settingsForm.contactPhone}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, contactPhone: e.target.value })}
+                          className="w-full bg-white border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
+                          placeholder="e.g. +234 706 229 7299"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">WhatsApp Order Number</label>
+                        <input
+                          type="text"
+                          required
+                          value={settingsForm.whatsappNumber}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, whatsappNumber: e.target.value })}
+                          className="w-full bg-white border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
+                          placeholder="e.g. 07062297299"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Operating Hours</label>
+                        <input
+                          type="text"
+                          required
+                          value={settingsForm.operatingHours}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, operatingHours: e.target.value })}
+                          className="w-full bg-white border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
+                          placeholder="e.g. Mon – Sat: 8:00 AM – 6:00 PM"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentView('products')}
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-3 rounded-2xl cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingSettings}
+                    className="bg-[#0B1B3D] hover:bg-[#142752] text-[#D4AF37] font-black px-6 py-3 rounded-2xl transition shadow-md cursor-pointer flex items-center gap-2"
+                  >
+                    {isSavingSettings ? 'Saving to Database...' : 'Save & Publish Live'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* VIEW: OVERVIEW */}
+          {currentView === 'overview' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm space-y-2">
+                <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-2">
                   <div className="flex justify-between items-center text-slate-400 text-xs font-bold">
                     <span>Total Revenue</span>
                     <TrendingUp size={16} className="text-emerald-600" />
@@ -431,7 +686,7 @@ export default function AdminDashboardPage() {
                   <p className="text-[11px] text-slate-400">All recorded customer orders</p>
                 </div>
 
-                <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm space-y-2">
+                <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-2">
                   <div className="flex justify-between items-center text-slate-400 text-xs font-bold">
                     <span>Pending Proofs</span>
                     <Clock size={16} className="text-amber-600" />
@@ -440,7 +695,7 @@ export default function AdminDashboardPage() {
                   <p className="text-[11px] text-slate-400">Awaiting bank verification</p>
                 </div>
 
-                <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm space-y-2">
+                <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-2">
                   <div className="flex justify-between items-center text-slate-400 text-xs font-bold">
                     <span>Total Products</span>
                     <Boxes size={16} className="text-purple-600" />
@@ -452,9 +707,9 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* VIEW 2: ORDERS, SLIPS & DISPATCH */}
+          {/* VIEW: ORDERS */}
           {currentView === 'orders' && (
-            <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-6">
+            <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
                 <div>
                   <h3 className="text-xl font-black text-[#0B1B3D]">Customer Orders & Slips</h3>
@@ -467,7 +722,7 @@ export default function AdminDashboardPage() {
                       key={s}
                       onClick={() => setOrderStatusFilter(s)}
                       className={`px-3 py-1.5 rounded-xl transition cursor-pointer ${
-                        orderStatusFilter === s ? 'bg-[#0B1B3D] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                        orderStatusFilter === s ? 'bg-[#0B1B3D] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
                       {s === 'ALL' ? 'All' : s === 'pending_verification' ? 'Pending' : s}
@@ -577,13 +832,13 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* VIEW 3: INVENTORY, DESCRIPTION & STOCK COUNTING */}
+          {/* VIEW: PRODUCTS */}
           {currentView === 'products' && (
-            <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-6">
+            <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
                 <div>
                   <h3 className="text-xl font-black text-[#0B1B3D]">Store Inventory & Stock Count</h3>
-                  <p className="text-xs text-slate-400">Manage photos, descriptions, quantity remaining, and spotlight badges</p>
+                  <p className="text-xs text-slate-400">Manage photos, color shades, descriptions, and stock counts</p>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -606,50 +861,67 @@ export default function AdminDashboardPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {filteredProducts.map((p) => (
-                  <div key={p.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-200/70 flex flex-col justify-between gap-3 group">
-                    <div className="space-y-3">
-                      <div className="relative h-44 w-full rounded-xl overflow-hidden bg-white border border-slate-200">
-                        <img src={p.imageUrl} alt={p.title} className="h-full w-full object-cover group-hover:scale-105 transition duration-300" />
-                        <span className="absolute top-2 left-2 bg-[#0B1B3D]/80 backdrop-blur-md text-[#D4AF37] text-[9px] uppercase font-bold px-2 py-0.5 rounded-full">
-                          {p.category}
-                        </span>
-                        <span className={`absolute bottom-2 left-2 text-white text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                          (p.stockQuantity ?? 0) > 5 ? 'bg-emerald-600/90' : (p.stockQuantity ?? 0) > 0 ? 'bg-amber-600/90' : 'bg-red-600/90'
-                        }`}>
-                          {p.stockQuantity ?? 0} In Stock
-                        </span>
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-xs text-slate-900 line-clamp-1">{p.title}</h4>
-                        <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{p.description || 'No description added.'}</p>
-                        <p className="text-sm font-black text-[#0B1B3D] mt-1.5">₦{p.price?.toLocaleString()}</p>
-                      </div>
-                    </div>
+                {filteredProducts.map((p) => {
+                  const colorCount = Array.isArray(p.colors) ? p.colors.length : 0;
+                  return (
+                    <div key={p.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-200/70 flex flex-col justify-between gap-3 group">
+                      <div className="space-y-3">
+                        <div className="relative h-44 w-full rounded-xl overflow-hidden bg-white border border-slate-200">
+                          <img src={p.imageUrl} alt={p.title} className="h-full w-full object-cover group-hover:scale-105 transition duration-300" />
+                          <span className="absolute top-2 left-2 bg-[#0B1B3D]/80 backdrop-blur-md text-[#D4AF37] text-[9px] uppercase font-bold px-2 py-0.5 rounded-full">
+                            {p.category}
+                          </span>
+                          <span className={`absolute bottom-2 left-2 text-white text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                            (p.stockQuantity ?? 0) > 5 ? 'bg-emerald-600/90' : (p.stockQuantity ?? 0) > 0 ? 'bg-amber-600/90' : 'bg-red-600/90'
+                          }`}>
+                            {p.stockQuantity ?? 0} In Stock
+                          </span>
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs text-slate-900 line-clamp-1">{p.title}</h4>
+                          <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{p.description || 'No description added.'}</p>
+                          
+                          {colorCount > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {p.colors.map((c: any, idx: number) => {
+                                const cName = typeof c === 'string' ? c : c.name;
+                                return (
+                                  <span key={idx} className="text-[9px] font-bold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded">
+                                    {cName}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
 
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-200/50">
-                      <span className={`text-[10px] font-bold ${(p.stockQuantity ?? 0) > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                        {(p.stockQuantity ?? 0) > 0 ? '● Active' : '○ Out of Stock'}
-                      </span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleOpenEditModal(p)}
-                          className="p-1.5 text-slate-500 hover:text-[#0B1B3D] hover:bg-slate-200/60 rounded-lg transition cursor-pointer"
-                          title="Edit Product"
-                        >
-                          <Edit3 size={15} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteProduct(p.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition cursor-pointer"
-                          title="Delete Product"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                          <p className="text-sm font-black text-[#0B1B3D] mt-1.5">₦{p.price?.toLocaleString()}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-200/50">
+                        <span className={`text-[10px] font-bold ${(p.stockQuantity ?? 0) > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                          {(p.stockQuantity ?? 0) > 0 ? '● Active' : '○ Out of Stock'}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleOpenEditModal(p)}
+                            className="p-1.5 text-slate-500 hover:text-[#0B1B3D] hover:bg-slate-200/60 rounded-lg transition cursor-pointer"
+                            title="Edit Product"
+                          >
+                            <Edit3 size={15} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProduct(p.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                            title="Delete Product"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -669,7 +941,7 @@ export default function AdminDashboardPage() {
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h3 className="font-black text-lg text-[#0B1B3D] flex items-center gap-2">
                   {editingProductId ? <Edit3 size={20} className="text-[#D4AF37]" /> : <Plus size={20} className="text-[#D4AF37]" />}
-                  {editingProductId ? 'Edit Product & Stock' : 'Add New Product'}
+                  {editingProductId ? 'Edit Product & Color Variants' : 'Add New Product'}
                 </h3>
                 <button onClick={() => setIsModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-800 rounded-lg cursor-pointer">
                   <X size={20} />
@@ -678,7 +950,7 @@ export default function AdminDashboardPage() {
 
               <form onSubmit={handleSaveProduct} className="space-y-4 text-xs">
                 <div className="space-y-2">
-                  <label className="font-bold text-slate-700 block">Product Photos *</label>
+                  <label className="font-bold text-slate-700 block">General Product Photos *</label>
                   <div className="border-2 border-dashed border-slate-200 rounded-2xl p-4 text-center cursor-pointer relative bg-slate-50">
                     <input
                       type="file"
@@ -707,18 +979,106 @@ export default function AdminDashboardPage() {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Electric Blender 2.0L"
+                    placeholder="e.g. Loose Wave French Curls Hair Extensions"
                     value={productForm.title}
                     onChange={(e) => setProductForm({ ...productForm, title: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
                   />
                 </div>
 
+                {/* COLOR VARIANT & PHOTO UPLOADER */}
+                <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                      <Palette size={15} className="text-[#0B1B3D]" />
+                      <span>Hair Color Variants & Photos</span>
+                    </label>
+                    <span className="text-[10px] text-slate-400 font-semibold">Optional</span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2.5">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Color name (e.g. Burgundy, Honey Blonde 27, 1B)..."
+                        value={colorNameInput}
+                        onChange={(e) => setColorNameInput(e.target.value)}
+                        className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-[#0B1B3D]"
+                      />
+
+                      <label className="h-10 px-3 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl flex items-center gap-1.5 cursor-pointer text-slate-700 text-xs font-bold transition shrink-0">
+                        <Camera size={14} className="text-[#0B1B3D]" />
+                        <span>{colorImagePreview ? 'Photo Picked' : 'Add Photo'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleColorImageSelect}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+
+                    {colorImagePreview && (
+                      <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
+                        <img src={colorImagePreview} alt="Color preview" className="h-10 w-10 object-cover rounded-md border" />
+                        <span className="text-[11px] font-bold text-emerald-700 flex-1 truncate">Photo attached for this shade</span>
+                        <button
+                          type="button"
+                          onClick={() => setColorImagePreview('')}
+                          className="text-xs text-red-500 font-bold hover:underline"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleAddColorVariant}
+                      className="w-full bg-[#0B1B3D] text-[#D4AF37] py-2 rounded-xl text-xs font-bold hover:bg-[#142752] transition cursor-pointer"
+                    >
+                      + Save Color Variant
+                    </button>
+                  </div>
+
+                  {productForm.colors.length > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      <p className="text-[11px] font-bold text-slate-500">Configured Shades ({productForm.colors.length}):</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {productForm.colors.map((col, idx) => (
+                          <div
+                            key={idx}
+                            className="bg-white border border-slate-200 p-2 rounded-xl flex items-center justify-between gap-2 shadow-xs"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <img
+                                src={col.image || productPreviews[0] || '/MARVEL_VARIETIES-removebg-preview.png'}
+                                alt={col.name}
+                                className="h-8 w-8 object-cover rounded-lg border border-slate-200 shrink-0"
+                              />
+                              <span className="font-bold text-slate-800 text-[11px] truncate">{col.name}</span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveColor(idx)}
+                              className="text-red-400 hover:text-red-600 font-black p-1 text-sm cursor-pointer"
+                              title="Delete color"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">Product Detailed Description</label>
                   <textarea
                     rows={3}
-                    placeholder="Describe specifications, material, sizing, warranties..."
+                    placeholder="Describe hair length, grade, texture, heat tolerance, sizing..."
                     value={productForm.description}
                     onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"

@@ -1,65 +1,100 @@
+// components/ui/OrderCountdown.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { Clock, AlertTriangle } from 'lucide-react';
 
 interface OrderCountdownProps {
-  createdAt: string | Date;
-  status: string;
+  initialMinutes?: number;
+  onExpire?: () => void;
 }
 
-export function OrderCountdown({ createdAt, status }: OrderCountdownProps) {
-  const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number } | null>(null);
-  const [isExpired, setIsExpired] = useState(false);
+export function OrderCountdown({ initialMinutes = 20, onExpire }: OrderCountdownProps) {
+  // Store target expiration timestamp in sessionStorage so page refreshes don't reset the timer
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(() => {
+    if (typeof window === 'undefined') return initialMinutes * 60;
+    
+    const savedDeadline = sessionStorage.getItem('mv_payment_deadline');
+    const now = Date.now();
+    
+    if (savedDeadline) {
+      const remaining = Math.max(0, Math.floor((parseInt(savedDeadline, 10) - now) / 1000));
+      return remaining;
+    } else {
+      const deadline = now + initialMinutes * 60 * 1000;
+      sessionStorage.setItem('mv_payment_deadline', deadline.toString());
+      return initialMinutes * 60;
+    }
+  });
 
   useEffect(() => {
-    if (status !== 'pending_verification') return;
+    if (secondsRemaining <= 0) {
+      if (onExpire) onExpire();
+      return;
+    }
 
-    const orderTime = new Date(createdAt).getTime();
-    const expiryTime = orderTime + 5 * 60 * 60 * 1000; // 5-hour payment review window
+    const interval = setInterval(() => {
+      setSecondsRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          if (onExpire) onExpire();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
-    const updateTimer = () => {
-      const now = new Date().getTime();
-      const distance = expiryTime - now;
-
-      if (distance <= 0) {
-        setIsExpired(true);
-        setTimeLeft(null);
-      } else {
-        const hours = Math.floor(distance / (1000 * 60 * 60));
-        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-        setTimeLeft({ hours, minutes, seconds });
-      }
-    };
-
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [createdAt, status]);
+  }, [secondsRemaining, onExpire]);
 
-  if (status !== 'pending_verification') return null;
-
-  if (isExpired) {
-    return (
-      <div className="inline-flex items-center gap-1.5 bg-red-50 border border-red-200 text-red-700 px-3 py-1 rounded-xl text-[11px] font-bold">
-        <AlertTriangle size={13} />
-        <span>Payment Window Expired (Contact Support)</span>
-      </div>
-    );
-  }
-
-  if (!timeLeft) return null;
+  const minutes = Math.floor(secondsRemaining / 60);
+  const seconds = secondsRemaining % 60;
+  const isExpired = secondsRemaining === 0;
+  const isUrgent = secondsRemaining < 300; // Under 5 mins
 
   return (
-    <div className="inline-flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1 rounded-xl text-[11px] font-bold">
-      <Clock size={13} className="text-amber-600 animate-pulse" />
-      <span>
-        Complete transfer within:{' '}
-        <span className="font-mono text-xs font-black">
-          {String(timeLeft.hours).padStart(2, '0')}:{String(timeLeft.minutes).padStart(2, '0')}:{String(timeLeft.seconds).padStart(2, '0')}
+    <div
+      className={`p-3.5 rounded-2xl border flex items-center justify-between transition-colors duration-300 ${
+        isExpired
+          ? 'bg-red-50 border-red-200 text-red-700'
+          : isUrgent
+          ? 'bg-amber-50 border-amber-300 text-amber-900 animate-pulse'
+          : 'bg-[#0B1B3D]/5 border-[#0B1B3D]/15 text-[#0B1B3D]'
+      }`}
+    >
+      <div className="flex items-center gap-2.5">
+        <div
+          className={`h-8 w-8 rounded-xl flex items-center justify-center font-bold shrink-0 ${
+            isExpired
+              ? 'bg-red-200 text-red-700'
+              : isUrgent
+              ? 'bg-amber-200 text-amber-800'
+              : 'bg-[#0B1B3D] text-[#D4AF37]'
+          }`}
+        >
+          {isExpired ? <AlertTriangle size={16} /> : <Clock size={16} />}
+        </div>
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-wider">
+            {isExpired ? 'Payment Session Expired' : 'Transfer Verification Timer'}
+          </p>
+          <p className="text-[10px] text-slate-500">
+            {isExpired
+              ? 'Your reserved order session has timed out. Please restart checkout.'
+              : 'Complete bank transfer and upload receipt before timer elapses.'}
+          </p>
+        </div>
+      </div>
+
+      <div className="text-right pl-3">
+        <span
+          className={`font-mono text-base sm:text-lg font-black tracking-wider ${
+            isExpired ? 'text-red-600' : isUrgent ? 'text-amber-600' : 'text-[#0B1B3D]'
+          }`}
+        >
+          {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
         </span>
-      </span>
+      </div>
     </div>
   );
 }
