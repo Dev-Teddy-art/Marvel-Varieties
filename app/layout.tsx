@@ -7,7 +7,6 @@ import { MobileBottomNav } from '@/components/ui/MobileBottomNav';
 
 const inter = Inter({ subsets: ['latin'] });
 
-// 1. Mobile Browser Top Bar Color (Safari & Chrome)
 export const viewport: Viewport = {
   themeColor: '#0B1B3D',
   width: 'device-width',
@@ -15,7 +14,6 @@ export const viewport: Viewport = {
   maximumScale: 5,
 };
 
-// 2. Complete Search Engine & Cross-Browser Metadata
 export const metadata: Metadata = {
   metadataBase: new URL('https://marvelvarieties.com'),
   title: {
@@ -45,6 +43,9 @@ export const metadata: Metadata = {
     telephone: true,
     address: true,
     email: true,
+  },
+  verification: {
+    google: 'EUMvZNSB63oUCBIk4sYIHmH8xc9LD_XXNzhHOzXgu4w',
   },
   icons: {
     icon: [
@@ -79,7 +80,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Marvel Varieties | Quality Essentials Lagos',
-    description: 'Shop household appliances, footwear, and essentials with verified bank transfer verification.',
+    description: 'Shop household appliances, footwear, and essentials with direct bank transfer payment verification.',
     images: ['/MARVEL_VARIETIES-removebg-preview.png'],
   },
   robots: {
