@@ -2,7 +2,7 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { products, orders, users, storeSettings } from '@/lib/db/schema';
+import { products, orders, users, storeSettings, ColorVariant } from '@/lib/db/schema';
 import { desc, eq, or } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 
@@ -24,7 +24,7 @@ export async function addProductAction(formData: {
   category: string;
   price: number;
   description?: string;
-  colors?: any[];
+  colors?: ColorVariant[];
   images: string[];
   inStock?: boolean;
   stockQuantity?: number;
@@ -32,12 +32,26 @@ export async function addProductAction(formData: {
 }) {
   try {
     const id = `prod_${Date.now()}`;
-    const allImages = formData.images && formData.images.length > 0 
-      ? formData.images 
-      : ['/MARVEL_VARIETIES-removebg-preview.png'];
+    const allImages =
+      formData.images && formData.images.length > 0
+        ? formData.images
+        : ['/MARVEL_VARIETIES-removebg-preview.png'];
 
-    const quantity = Number(formData.stockQuantity) >= 0 ? Number(formData.stockQuantity) : 10;
-    const colorList = Array.isArray(formData.colors) ? formData.colors : [];
+    const colorList: ColorVariant[] = Array.isArray(formData.colors)
+      ? formData.colors.map((c) => ({
+          name: c.name,
+          image: c.image || '',
+          stock: Math.max(0, Number(c.stock) || 0),
+        }))
+      : [];
+
+    // If variants exist, compute total stock from sum of variants; otherwise fallback to stockQuantity
+    const quantity =
+      colorList.length > 0
+        ? colorList.reduce((acc, c) => acc + (Number(c.stock) || 0), 0)
+        : Number(formData.stockQuantity) >= 0
+        ? Number(formData.stockQuantity)
+        : 10;
 
     await db.insert(products).values({
       id,
@@ -63,13 +77,13 @@ export async function addProductAction(formData: {
 }
 
 export async function updateProductAction(
-  id: string, 
+  id: string,
   formData: {
     title: string;
     category: string;
     price: number;
     description?: string;
-    colors?: any[];
+    colors?: ColorVariant[];
     images: string[];
     inStock?: boolean;
     stockQuantity?: number;
@@ -77,25 +91,42 @@ export async function updateProductAction(
   }
 ) {
   try {
-    const allImages = formData.images && formData.images.length > 0 
-      ? formData.images 
-      : ['/MARVEL_VARIETIES-removebg-preview.png'];
+    const allImages =
+      formData.images && formData.images.length > 0
+        ? formData.images
+        : ['/MARVEL_VARIETIES-removebg-preview.png'];
 
-    const quantity = Number(formData.stockQuantity) >= 0 ? Number(formData.stockQuantity) : 0;
-    const colorList = Array.isArray(formData.colors) ? formData.colors : [];
+    const colorList: ColorVariant[] = Array.isArray(formData.colors)
+      ? formData.colors.map((c) => ({
+          name: c.name,
+          image: c.image || '',
+          stock: Math.max(0, Number(c.stock) || 0),
+        }))
+      : [];
 
-    await db.update(products).set({
-      title: formData.title,
-      category: formData.category,
-      price: formData.price,
-      description: formData.description || '',
-      imageUrl: allImages[0],
-      images: allImages,
-      colors: colorList,
-      inStock: quantity > 0,
-      stockQuantity: quantity,
-      isFeatured: formData.isFeatured ?? false,
-    }).where(eq(products.id, id));
+    // Automatically recalculate aggregate stock if color variants exist
+    const quantity =
+      colorList.length > 0
+        ? colorList.reduce((acc, c) => acc + (Number(c.stock) || 0), 0)
+        : Number(formData.stockQuantity) >= 0
+        ? Number(formData.stockQuantity)
+        : 0;
+
+    await db
+      .update(products)
+      .set({
+        title: formData.title,
+        category: formData.category,
+        price: formData.price,
+        description: formData.description || '',
+        imageUrl: allImages[0],
+        images: allImages,
+        colors: colorList,
+        inStock: quantity > 0,
+        stockQuantity: quantity,
+        isFeatured: formData.isFeatured ?? false,
+      })
+      .where(eq(products.id, id));
 
     revalidatePath('/');
     revalidatePath('/admin');
@@ -118,7 +149,81 @@ export async function deleteProductAction(id: string) {
 }
 
 // ==========================================
-// 2. ORDER ACTIONS (CREATION, STATUS & SEARCH)
+// 2. STOCK DEDUCTION UTILITY
+// ==========================================
+
+export async function deductProductStockAction(
+  orderItems: Array<{
+    id: string;
+    quantity: number;
+    selectedColor?: string;
+  }>
+) {
+  try {
+    for (const item of orderItems) {
+      const [product] = await db
+        .select()
+        .from(products)
+        .where(eq(products.id, item.id))
+        .limit(1);
+
+      if (!product) continue;
+
+      let colorList: ColorVariant[] = Array.isArray(product.colors)
+        ? [...product.colors]
+        : typeof product.colors === 'string'
+        ? JSON.parse(product.colors || '[]')
+        : [];
+
+      // Case A: Product has configured color shades and user ordered a specific shade
+      if (colorList.length > 0 && item.selectedColor) {
+        let matched = false;
+        colorList = colorList.map((variant) => {
+          if (variant.name.trim().toLowerCase() === item.selectedColor?.trim().toLowerCase()) {
+            matched = true;
+            const updatedStock = Math.max(0, (Number(variant.stock) || 0) - item.quantity);
+            return { ...variant, stock: updatedStock };
+          }
+          return variant;
+        });
+
+        // Recalculate total units across all shades
+        const totalStock = colorList.reduce((sum, v) => sum + (Number(v.stock) || 0), 0);
+
+        await db
+          .update(products)
+          .set({
+            colors: colorList,
+            stockQuantity: totalStock,
+            inStock: totalStock > 0,
+          })
+          .where(eq(products.id, item.id));
+      } else {
+        // Case B: Standard product without shade variants
+        const currentQty = product.stockQuantity !== null ? product.stockQuantity : 0;
+        const newStock = Math.max(0, currentQty - item.quantity);
+
+        await db
+          .update(products)
+          .set({
+            stockQuantity: newStock,
+            inStock: newStock > 0,
+          })
+          .where(eq(products.id, item.id));
+      }
+    }
+
+    revalidatePath('/');
+    revalidatePath('/admin');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Failed to deduct product stock:', error);
+    return { success: false, error: error?.message || 'Stock deduction error' };
+  }
+}
+
+// ==========================================
+// 3. ORDER ACTIONS (CREATION, STATUS & SEARCH)
 // ==========================================
 
 export async function getOrdersAction() {
@@ -165,8 +270,20 @@ export async function createOrderAction(orderData: {
       items: orderData.items,
     });
 
+    // Automatically deduct product & variant inventory upon order placement
+    const orderItemsList = Array.isArray(orderData.items)
+      ? orderData.items
+      : typeof orderData.items === 'string'
+      ? JSON.parse(orderData.items || '[]')
+      : [];
+
+    if (orderItemsList.length > 0) {
+      await deductProductStockAction(orderItemsList);
+    }
+
     revalidatePath('/admin');
     revalidatePath('/account');
+    revalidatePath('/');
     return { success: true };
   } catch (error) {
     console.error('Failed to record order:', error);
@@ -243,7 +360,7 @@ export async function getCustomerOrdersAction(phoneOrEmail: string) {
 }
 
 // ==========================================
-// 3. AUTH & USER ACTIONS
+// 4. AUTH & USER ACTIONS
 // ==========================================
 
 export async function registerUserAction(data: {
@@ -286,9 +403,9 @@ export async function registerUserAction(data: {
       role: assignedRole,
     });
 
-    return { 
-      success: true, 
-      user: { id, fullName: data.fullName.trim(), email: cleanEmail, phone: cleanPhone, role: assignedRole } 
+    return {
+      success: true,
+      user: { id, fullName: data.fullName.trim(), email: cleanEmail, phone: cleanPhone, role: assignedRole },
     };
   } catch (error: any) {
     return { success: false, error: error?.message || 'Database error creating account' };
@@ -333,7 +450,7 @@ export async function loginUserAction(identifier: string, pass: string) {
 }
 
 // ==========================================
-// 4. STORE SETTINGS & BANK INFO ACTIONS
+// 5. STORE SETTINGS & BANK INFO ACTIONS
 // ==========================================
 
 export async function getStoreSettingsAction() {

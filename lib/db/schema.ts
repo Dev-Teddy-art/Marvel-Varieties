@@ -4,6 +4,7 @@ import { pgTable, text, integer, boolean, timestamp, json } from 'drizzle-orm/pg
 export interface ColorVariant {
   name: string;
   image?: string;
+  stock: number; // units available for this specific color shade
 }
 
 export const products = pgTable('products', {
@@ -14,7 +15,7 @@ export const products = pgTable('products', {
   description: text('description').default(''),
   imageUrl: text('image_url').notNull(),
   images: json('images').$type<string[]>().default([]),
-  colors: json('colors').$type<any[]>().default([]),
+  colors: json('colors').$type<ColorVariant[]>().default([]),
   inStock: boolean('in_stock').default(true),
   stockQuantity: integer('stock_quantity').default(10),
   isFeatured: boolean('is_featured').default(false),

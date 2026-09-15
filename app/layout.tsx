@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { CartDrawer } from '@/components/ui/CartDrawer';
 import { MobileBottomNav } from '@/components/ui/MobileBottomNav';
+import { WhatsAppButton } from '@/components/ui/whatsAppButton';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -132,11 +133,14 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className={`${inter.className} pb-16 md:pb-0 antialiased`}>
+      <body className={`${inter.className} pb-16 md:pb-0 antialiased relative`}>
         {children}
 
         {/* Global Cart Slide-Over Drawer */}
         <CartDrawer />
+
+        {/* Floating Green WhatsApp Quick Contact Button */}
+        <WhatsAppButton />
 
         {/* Global Mobile Bottom Navigation */}
         <MobileBottomNav />

@@ -61,6 +61,7 @@ const CATEGORIES = [
 interface ColorVariantItem {
   name: string;
   image?: string;
+  stock: number;
 }
 
 export default function AdminDashboardPage() {
@@ -111,6 +112,7 @@ export default function AdminDashboardPage() {
   });
 
   const [colorNameInput, setColorNameInput] = useState('');
+  const [colorStockInput, setColorStockInput] = useState<number>(1);
   const [colorImagePreview, setColorImagePreview] = useState<string>('');
 
   useEffect(() => {
@@ -214,6 +216,7 @@ export default function AdminDashboardPage() {
       isFeatured: false,
     });
     setColorNameInput('');
+    setColorStockInput(1);
     setColorImagePreview('');
     setProductPreviews([]);
     setIsModalOpen(true);
@@ -221,22 +224,34 @@ export default function AdminDashboardPage() {
 
   const handleOpenEditModal = (p: any) => {
     setEditingProductId(p.id);
-    const rawColors = Array.isArray(p.colors) ? p.colors : [];
-    const normalizedColors: ColorVariantItem[] = rawColors.map((c: any) => 
-      typeof c === 'string' ? { name: c, image: p.imageUrl } : c
-    );
+    const rawColors = Array.isArray(p.colors)
+      ? p.colors
+      : typeof p.colors === 'string'
+      ? JSON.parse(p.colors || '[]')
+      : [];
+
+    const normalizedColors: ColorVariantItem[] = rawColors.map((c: any) => ({
+      name: typeof c === 'string' ? c : c.name,
+      image: typeof c === 'string' ? p.imageUrl : c.image || p.imageUrl,
+      stock: typeof c === 'object' && c.stock !== undefined ? Math.max(0, Number(c.stock)) : 5,
+    }));
+
+    const computedStock = normalizedColors.length > 0
+      ? normalizedColors.reduce((sum, v) => sum + v.stock, 0)
+      : p.stockQuantity ?? 10;
 
     setProductForm({
       title: p.title,
       category: p.category,
       price: p.price.toString(),
-      stockQuantity: (p.stockQuantity ?? 10).toString(),
+      stockQuantity: computedStock.toString(),
       description: p.description || '',
       colors: normalizedColors,
       inStock: p.inStock,
       isFeatured: p.isFeatured || false,
     });
     setColorNameInput('');
+    setColorStockInput(1);
     setColorImagePreview('');
     setProductPreviews(p.images && p.images.length > 0 ? p.images : [p.imageUrl]);
     setIsModalOpen(true);
@@ -256,25 +271,41 @@ export default function AdminDashboardPage() {
     e.preventDefault();
     const cleanName = colorNameInput.trim();
     if (!cleanName) {
-      alert('Please enter a color name (e.g. Burgundy, 1B Natural Black)');
+      alert('Please enter a color name (e.g. Burgundy, Honey Blonde 27, 1B)');
       return;
     }
 
     const fallbackImg = colorImagePreview || productPreviews[0] || '/MARVEL_VARIETIES-removebg-preview.png';
+    const newVariantStock = Math.max(0, Number(colorStockInput) || 0);
+
+    const updatedColors = [
+      ...productForm.colors,
+      { name: cleanName, image: fallbackImg, stock: newVariantStock },
+    ];
+
+    const totalVariantStock = updatedColors.reduce((sum, c) => sum + (Number(c.stock) || 0), 0);
 
     setProductForm((prev) => ({
       ...prev,
-      colors: [...prev.colors, { name: cleanName, image: fallbackImg }],
+      colors: updatedColors,
+      stockQuantity: totalVariantStock.toString(),
     }));
 
     setColorNameInput('');
+    setColorStockInput(1);
     setColorImagePreview('');
   };
 
   const handleRemoveColor = (indexToRemove: number) => {
+    const updatedColors = productForm.colors.filter((_, idx) => idx !== indexToRemove);
+    const totalVariantStock = updatedColors.length > 0
+      ? updatedColors.reduce((sum, c) => sum + (Number(c.stock) || 0), 0)
+      : 10;
+
     setProductForm((prev) => ({
       ...prev,
-      colors: prev.colors.filter((_, idx) => idx !== indexToRemove),
+      colors: updatedColors,
+      stockQuantity: totalVariantStock.toString(),
     }));
   };
 
@@ -299,16 +330,22 @@ export default function AdminDashboardPage() {
     }
 
     setIsSubmittingProduct(true);
-    const count = parseInt(productForm.stockQuantity, 10);
+    
+    const calculatedStock = productForm.colors.length > 0
+      ? productForm.colors.reduce((sum, c) => sum + (Number(c.stock) || 0), 0)
+      : parseInt(productForm.stockQuantity, 10);
+
+    const count = isNaN(calculatedStock) ? 0 : calculatedStock;
+
     const payload = {
       title: productForm.title,
       category: productForm.category,
       price: parseInt(productForm.price, 10),
-      stockQuantity: isNaN(count) ? 0 : count,
+      stockQuantity: count,
       description: productForm.description,
       colors: productForm.colors,
       images: productPreviews,
-      inStock: (isNaN(count) ? 0 : count) > 0,
+      inStock: count > 0,
       isFeatured: productForm.isFeatured,
     };
 
@@ -469,7 +506,7 @@ export default function AdminDashboardPage() {
         </div>
       </header>
 
-      {/* Main Container - Responsive flex layout that prevents overlapping */}
+      {/* Main Container */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full flex-1 flex flex-col md:flex-row gap-6 items-start">
         
         {/* Navigation Sidebar */}
@@ -862,7 +899,12 @@ export default function AdminDashboardPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {filteredProducts.map((p) => {
-                  const colorCount = Array.isArray(p.colors) ? p.colors.length : 0;
+                  const rawColors = Array.isArray(p.colors)
+                    ? p.colors
+                    : typeof p.colors === 'string'
+                    ? JSON.parse(p.colors || '[]')
+                    : [];
+
                   return (
                     <div key={p.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-200/70 flex flex-col justify-between gap-3 group">
                       <div className="space-y-3">
@@ -881,13 +923,19 @@ export default function AdminDashboardPage() {
                           <h4 className="font-bold text-xs text-slate-900 line-clamp-1">{p.title}</h4>
                           <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{p.description || 'No description added.'}</p>
                           
-                          {colorCount > 0 && (
+                          {rawColors.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-2">
-                              {p.colors.map((c: any, idx: number) => {
+                              {rawColors.map((c: any, idx: number) => {
                                 const cName = typeof c === 'string' ? c : c.name;
+                                const cStock = typeof c === 'object' && c.stock !== undefined ? c.stock : null;
                                 return (
-                                  <span key={idx} className="text-[9px] font-bold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded">
-                                    {cName}
+                                  <span key={idx} className="text-[9px] font-bold bg-amber-50 border border-amber-200/60 text-amber-900 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                    <span>{cName}</span>
+                                    {cStock !== null && (
+                                      <span className="text-[8px] bg-amber-200/60 text-amber-950 px-1 rounded-sm font-mono font-black">
+                                        {cStock}
+                                      </span>
+                                    )}
                                   </span>
                                 );
                               })}
@@ -986,29 +1034,43 @@ export default function AdminDashboardPage() {
                   />
                 </div>
 
-                {/* COLOR VARIANT & PHOTO UPLOADER */}
+                {/* COLOR VARIANT & PHOTO UPLOADER WITH STOCK */}
                 <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
                   <div className="flex items-center justify-between">
                     <label className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
                       <Palette size={15} className="text-[#0B1B3D]" />
                       <span>Hair Color Variants & Photos</span>
                     </label>
-                    <span className="text-[10px] text-slate-400 font-semibold">Optional</span>
+                    <span className="text-[10px] text-slate-400 font-semibold">
+                      {productForm.colors.length > 0 
+                        ? `Total Variant Units: ${productForm.colors.reduce((sum, c) => sum + (Number(c.stock) || 0), 0)}` 
+                        : 'Optional'}
+                    </span>
                   </div>
 
                   <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2.5">
-                    <div className="flex gap-2">
+                    <div className="grid grid-cols-12 gap-2">
                       <input
                         type="text"
-                        placeholder="Color name (e.g. Burgundy, Honey Blonde 27, 1B)..."
+                        placeholder="Color shade (e.g. Burgundy, Honey Blonde 27)..."
                         value={colorNameInput}
                         onChange={(e) => setColorNameInput(e.target.value)}
-                        className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-[#0B1B3D]"
+                        className="col-span-6 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-[#0B1B3D]"
                       />
 
-                      <label className="h-10 px-3 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl flex items-center gap-1.5 cursor-pointer text-slate-700 text-xs font-bold transition shrink-0">
-                        <Camera size={14} className="text-[#0B1B3D]" />
-                        <span>{colorImagePreview ? 'Photo Picked' : 'Add Photo'}</span>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="Stock"
+                        value={colorStockInput}
+                        onChange={(e) => setColorStockInput(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                        className="col-span-3 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-[#0B1B3D]"
+                        title="Stock units for this shade"
+                      />
+
+                      <label className="col-span-3 h-10 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl flex items-center justify-center gap-1 cursor-pointer text-slate-700 text-[11px] font-bold transition truncate">
+                        <Camera size={13} className="text-[#0B1B3D] shrink-0" />
+                        <span className="truncate">{colorImagePreview ? 'Selected' : 'Photo'}</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -1020,8 +1082,8 @@ export default function AdminDashboardPage() {
 
                     {colorImagePreview && (
                       <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
-                        <img src={colorImagePreview} alt="Color preview" className="h-10 w-10 object-cover rounded-md border" />
-                        <span className="text-[11px] font-bold text-emerald-700 flex-1 truncate">Photo attached for this shade</span>
+                        <img src={colorImagePreview} alt="Color preview" className="h-9 w-9 object-cover rounded-md border" />
+                        <span className="text-[11px] font-bold text-emerald-700 flex-1 truncate">Custom photo ready for this shade</span>
                         <button
                           type="button"
                           onClick={() => setColorImagePreview('')}
@@ -1056,7 +1118,10 @@ export default function AdminDashboardPage() {
                                 alt={col.name}
                                 className="h-8 w-8 object-cover rounded-lg border border-slate-200 shrink-0"
                               />
-                              <span className="font-bold text-slate-800 text-[11px] truncate">{col.name}</span>
+                              <div className="min-w-0">
+                                <span className="font-bold text-slate-800 text-[11px] truncate block">{col.name}</span>
+                                <span className="text-[10px] text-amber-700 font-bold block">{col.stock} in stock</span>
+                              </div>
                             </div>
 
                             <button
@@ -1109,15 +1174,26 @@ export default function AdminDashboardPage() {
                   </div>
 
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Stock Left (Units) *</label>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      {productForm.colors.length > 0 ? 'Total Stock (Auto)' : 'Stock Left (Units) *'}
+                    </label>
                     <input
                       type="number"
                       required
                       min="0"
+                      disabled={productForm.colors.length > 0}
                       placeholder="10"
-                      value={productForm.stockQuantity}
+                      value={
+                        productForm.colors.length > 0
+                          ? productForm.colors.reduce((sum, c) => sum + (Number(c.stock) || 0), 0)
+                          : productForm.stockQuantity
+                      }
                       onChange={(e) => setProductForm({ ...productForm, stockQuantity: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none"
+                      className={`w-full border rounded-xl p-3 focus:outline-none ${
+                        productForm.colors.length > 0 
+                          ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed font-bold' 
+                          : 'bg-slate-50 border-slate-200'
+                      }`}
                     />
                   </div>
                 </div>
