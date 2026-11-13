@@ -4,7 +4,6 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import { useCart } from '@/lib/store/useCart';
 import { OrderCountdown } from '@/components/ui/OrderCountdown';
 import { createOrderAction, getStoreSettingsAction } from '@/lib/actions';
@@ -18,7 +17,8 @@ import {
   Building2, 
   ShoppingBag, 
   Truck, 
-  AlertCircle 
+  AlertCircle,
+  UserCheck
 } from 'lucide-react';
 
 const LAGOS_AREAS = [
@@ -33,7 +33,6 @@ const LAGOS_AREAS = [
 ];
 
 export default function CheckoutPage() {
-  const router = useRouter();
   const cart = useCart() as any;
   const items = cart.items || [];
   const clearCart = cart.clearCart || (() => {});
@@ -43,14 +42,16 @@ export default function CheckoutPage() {
     0
   );
 
-  const [currentUser, setCurrentUser] = useState<any | null>(null);
   const [copiedAccount, setCopiedAccount] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [orderComplete, setOrderComplete] = useState<string | null>(null);
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
   const [timerExpired, setTimerExpired] = useState(false);
 
-  // Delivery Details Form
+  // Guest / Customer Details Form
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
   const [deliveryState, setDeliveryState] = useState(LAGOS_AREAS[0]);
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [alternatePhone, setAlternatePhone] = useState('');
@@ -70,16 +71,15 @@ export default function CheckoutPage() {
   const grandTotal = totalPrice + deliveryFee;
 
   useEffect(() => {
-    // 1. Check user login session
+    // 1. Pre-fill details if a user happens to be logged in, otherwise allow guest entry
     const savedUser = localStorage.getItem('marvel_user');
-    if (!savedUser) {
-      router.push('/login?redirect=checkout');
-      return;
-    }
-    try {
-      setCurrentUser(JSON.parse(savedUser));
-    } catch (e) {
-      router.push('/login?redirect=checkout');
+    if (savedUser) {
+      try {
+        const parsed = JSON.parse(savedUser);
+        if (parsed.fullName) setCustomerName(parsed.fullName);
+        if (parsed.phone) setCustomerPhone(parsed.phone);
+        if (parsed.email) setCustomerEmail(parsed.email);
+      } catch (e) {}
     }
 
     // 2. Load live bank settings from database
@@ -94,7 +94,7 @@ export default function CheckoutPage() {
       }
     }
     fetchBankInfo();
-  }, [router]);
+  }, []);
 
   const handleCopyAccount = () => {
     navigator.clipboard.writeText(bankSettings.accountNumber);
@@ -117,7 +117,12 @@ export default function CheckoutPage() {
     e.preventDefault();
 
     if (timerExpired) {
-      alert('Your 20-minute payment session expired. Please refresh the page to restart.');
+      alert('Your 1-minute payment session expired. Please refresh the page to restart.');
+      return;
+    }
+
+    if (!customerName.trim() || !customerPhone.trim()) {
+      alert('Please enter your full name and phone number.');
       return;
     }
 
@@ -137,13 +142,13 @@ export default function CheckoutPage() {
     try {
       const res = await createOrderAction({
         orderReference: orderRef,
-        customerName: currentUser?.fullName || 'Customer',
-        customerPhone: currentUser?.phone || '',
-        customerEmail: currentUser?.email || '',
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        customerEmail: customerEmail.trim(),
         deliveryState,
         deliveryAddress: deliveryAddress.trim(),
-        recipientName: isDropship ? recipientName.trim() : currentUser?.fullName,
-        recipientPhone: isDropship ? recipientPhone.trim() : (alternatePhone.trim() || currentUser?.phone),
+        recipientName: isDropship ? recipientName.trim() : customerName.trim(),
+        recipientPhone: isDropship ? recipientPhone.trim() : (alternatePhone.trim() || customerPhone.trim()),
         isDropship,
         totalAmount: grandTotal,
         receiptUrl: receiptPreview,
@@ -151,7 +156,6 @@ export default function CheckoutPage() {
       });
 
       if (res.success) {
-        // Clear session deadline and cart
         sessionStorage.removeItem('mv_payment_deadline');
         clearCart();
         setOrderComplete(orderRef);
@@ -188,7 +192,7 @@ export default function CheckoutPage() {
           </div>
 
           <p className="text-xs text-slate-500 leading-relaxed">
-            Our dispatch admin will verify your bank transfer slip and package your items for delivery.
+            Our dispatch admin will verify your bank transfer slip and package your items for delivery. Use your reference number or phone number to track your order anytime.
           </p>
 
           <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
@@ -251,25 +255,37 @@ export default function CheckoutPage() {
               priority
             />
           </div>
-          <div className="text-xs font-bold text-slate-400">
-            Secure Direct Transfer
+          <div className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+            <UserCheck size={14} /> Guest Checkout
           </div>
         </div>
       </header>
 
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        {/* 20-Minute Payment Countdown Timer */}
+        {/* 1-Minute Payment Countdown Timer */}
         <OrderCountdown
-          initialMinutes={20}
+          initialMinutes={1}
           onExpire={() => setTimerExpired(true)}
         />
 
         {timerExpired && (
-          <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-xs flex items-center gap-2">
-            <AlertCircle size={18} className="shrink-0" />
-            <span>
-              Your 20-minute reservation window has ended. Please refresh this page to begin a new verification session.
-            </span>
+          <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-xs flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <AlertCircle size={18} className="shrink-0" />
+              <span>
+                Your 1-minute reservation window has ended. Please refresh this page to begin a new verification session.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                sessionStorage.removeItem('mv_payment_deadline');
+                window.location.reload();
+              }}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1.5 rounded-xl shrink-0 cursor-pointer"
+            >
+              Restart
+            </button>
           </div>
         )}
 
@@ -278,18 +294,50 @@ export default function CheckoutPage() {
           <div className="md:col-span-7 space-y-5">
             {/* Delivery Destination Box */}
             <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
-              <h3 className="text-sm font-black text-[#0B1B3D] flex items-center gap-2 border-b border-slate-100 pb-2.5">
-                <Truck size={16} className="text-[#D4AF37]" /> Delivery & Recipient Details
-              </h3>
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <h3 className="text-sm font-black text-[#0B1B3D] flex items-center gap-2">
+                  <Truck size={16} className="text-[#D4AF37]" /> Delivery & Contact Details
+                </h3>
+                <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2.5 py-0.5 rounded-full">
+                  No Registration Needed
+                </span>
+              </div>
 
               <div className="space-y-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Full Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Chioma Adeyemi"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Phone / WhatsApp Number *</label>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="e.g. 08012345678"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Customer / Ordering As</label>
+                  <label className="font-bold text-slate-700 block mb-1">Email Address (Optional)</label>
                   <input
-                    type="text"
-                    disabled
-                    value={`${currentUser?.fullName || ''} (${currentUser?.phone || ''})`}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-500 font-semibold cursor-not-allowed"
+                    type="email"
+                    placeholder="e.g. name@example.com"
+                    value={customerEmail}
+                    onChange={(e) => setCustomerEmail(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
                   />
                 </div>
 
@@ -377,7 +425,7 @@ export default function CheckoutPage() {
                 <span className="text-[10px] font-black uppercase tracking-wider text-[#D4AF37] flex items-center gap-1.5">
                   <Building2 size={14} /> Official Settlement Account
                 </span>
-                <span className="text-[10px] text-slate-400">20-Min Window</span>
+                <span className="text-[10px] text-amber-300 font-bold">1-Min Window</span>
               </div>
 
               <div className="space-y-1 text-xs">

@@ -1,8 +1,7 @@
 // components/ui/CartDrawer.tsx
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import Image from 'next/image';
+import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/lib/store/useCart';
 import { 
@@ -12,8 +11,7 @@ import {
   Minus, 
   Trash2, 
   ArrowRight, 
-  ShieldCheck, 
-  Lock 
+  ShieldCheck 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -29,27 +27,9 @@ export function CartDrawer() {
   const totalItems = items.reduce((acc: number, item: any) => acc + (item.quantity || 1), 0);
   const totalPrice = items.reduce((acc: number, item: any) => acc + ((item.price || 0) * (item.quantity || 1)), 0);
 
-  const [currentUser, setCurrentUser] = useState<any | null>(null);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('marvel_user');
-    if (saved) {
-      try {
-        setCurrentUser(JSON.parse(saved));
-      } catch (e) {
-        setCurrentUser(null);
-      }
-    }
-  }, [isOpen]);
-
   const handleCheckoutClick = () => {
     closeCart();
-    // Rule: Guest users must register or login before paying
-    if (!currentUser) {
-      router.push('/login?redirect=checkout');
-    } else {
-      router.push('/checkout');
-    }
+    router.push('/checkout');
   };
 
   return (
@@ -143,7 +123,7 @@ export function CartDrawer() {
                           <div className="flex items-center bg-white border border-slate-200 rounded-lg">
                             <button
                               type="button"
-                              onClick={() => updateQuantity(item.id, Math.max(1, (item.quantity || 1) - 1))}
+                              onClick={() => updateQuantity(item.id, Math.max(1, (item.quantity || 1) - 1), item.selectedColor)}
                               className="p-1 text-slate-500 hover:text-black cursor-pointer"
                             >
                               <Minus size={12} />
@@ -153,7 +133,7 @@ export function CartDrawer() {
                             </span>
                             <button
                               type="button"
-                              onClick={() => updateQuantity(item.id, (item.quantity || 1) + 1)}
+                              onClick={() => updateQuantity(item.id, (item.quantity || 1) + 1, item.selectedColor)}
                               className="p-1 text-slate-500 hover:text-black cursor-pointer"
                             >
                               <Plus size={12} />
@@ -162,7 +142,7 @@ export function CartDrawer() {
 
                           <button
                             type="button"
-                            onClick={() => removeItem(item.id)}
+                            onClick={() => removeItem(item.id, item.selectedColor)}
                             className="text-slate-400 hover:text-red-500 p-1 transition cursor-pointer"
                             title="Remove item"
                           >
@@ -194,19 +174,12 @@ export function CartDrawer() {
                   </div>
                 </div>
 
-                {!currentUser && (
-                  <div className="bg-amber-50 border border-amber-200/80 p-2.5 rounded-xl flex items-center gap-2 text-[11px] text-amber-800">
-                    <Lock size={14} className="shrink-0 text-amber-600" />
-                    <span>Registration required before completing purchase.</span>
-                  </div>
-                )}
-
                 <button
                   type="button"
                   onClick={handleCheckoutClick}
                   className="w-full bg-[#0B1B3D] hover:bg-[#142752] text-[#D4AF37] font-black text-xs py-3.5 rounded-2xl flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
                 >
-                  <span>{currentUser ? 'Proceed to Checkout' : 'Register / Sign In to Checkout'}</span>
+                  <span>Proceed to Checkout</span>
                   <ArrowRight size={15} />
                 </button>
 
