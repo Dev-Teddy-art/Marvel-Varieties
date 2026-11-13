@@ -4,15 +4,23 @@
 import { db } from '@/lib/db';
 import { products, orders, users, storeSettings, ColorVariant } from '@/lib/db/schema';
 import { desc, eq, or } from 'drizzle-orm';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
 
 // ==========================================
-// 1. PRODUCT ACTIONS (STOCK, COLORS & DETAILS)
+// 1. PRODUCT ACTIONS (CACHED EDGE QUERIES, STOCK & COLORS)
 // ==========================================
+
+const getCachedProducts = unstable_cache(
+  async () => {
+    return await db.select().from(products).orderBy(desc(products.createdAt));
+  },
+  ['marvel-products-list'],
+  { tags: ['products'], revalidate: 3600 }
+);
 
 export async function getProductsAction() {
   try {
-    return await db.select().from(products).orderBy(desc(products.createdAt));
+    return await getCachedProducts();
   } catch (error) {
     console.error('Failed to fetch products:', error);
     return [];
@@ -67,6 +75,7 @@ export async function addProductAction(formData: {
       isFeatured: formData.isFeatured || false,
     });
 
+    revalidateTag('products', 'max');
     revalidatePath('/');
     revalidatePath('/admin');
     return { success: true };
@@ -128,6 +137,7 @@ export async function updateProductAction(
       })
       .where(eq(products.id, id));
 
+    revalidateTag('products', 'max');
     revalidatePath('/');
     revalidatePath('/admin');
     return { success: true };
@@ -140,6 +150,7 @@ export async function updateProductAction(
 export async function deleteProductAction(id: string) {
   try {
     await db.delete(products).where(eq(products.id, id));
+    revalidateTag('products', 'max');
     revalidatePath('/');
     revalidatePath('/admin');
     return { success: true };
@@ -177,10 +188,8 @@ export async function deductProductStockAction(
 
       // Case A: Product has configured color shades and user ordered a specific shade
       if (colorList.length > 0 && item.selectedColor) {
-        let matched = false;
         colorList = colorList.map((variant) => {
           if (variant.name.trim().toLowerCase() === item.selectedColor?.trim().toLowerCase()) {
-            matched = true;
             const updatedStock = Math.max(0, (Number(variant.stock) || 0) - item.quantity);
             return { ...variant, stock: updatedStock };
           }
@@ -213,6 +222,7 @@ export async function deductProductStockAction(
       }
     }
 
+    revalidateTag('products', 'max');
     revalidatePath('/');
     revalidatePath('/admin');
     return { success: true };
@@ -450,11 +460,11 @@ export async function loginUserAction(identifier: string, pass: string) {
 }
 
 // ==========================================
-// 5. STORE SETTINGS & BANK INFO ACTIONS
+// 5. STORE SETTINGS & BANK INFO ACTIONS (CACHED)
 // ==========================================
 
-export async function getStoreSettingsAction() {
-  try {
+const getCachedStoreSettings = unstable_cache(
+  async () => {
     const settings = await db
       .select()
       .from(storeSettings)
@@ -476,6 +486,14 @@ export async function getStoreSettingsAction() {
       return initial;
     }
     return settings[0];
+  },
+  ['marvel-store-settings'],
+  { tags: ['store_settings'], revalidate: 3600 }
+);
+
+export async function getStoreSettingsAction() {
+  try {
+    return await getCachedStoreSettings();
   } catch (error) {
     console.error('Failed to get store settings:', error);
     return {
@@ -514,8 +532,10 @@ export async function updateStoreSettingsAction(data: {
         },
       });
 
+    revalidateTag('store_settings', 'max');
     revalidatePath('/');
     revalidatePath('/admin');
+    revalidatePath('/checkout');
     return { success: true };
   } catch (error) {
     console.error('Failed to update store settings:', error);
