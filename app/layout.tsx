@@ -51,7 +51,7 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: '/icon.png', sizes: '32x32', type: 'image/png' },
-      { url: '/MARVEL_VARIETIES-removebg-preview.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon.png', sizes: '192x192', type: 'image/png' },
     ],
     shortcut: '/icon.png',
     apple: [
