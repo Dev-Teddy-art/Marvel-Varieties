@@ -77,7 +77,7 @@ function HomePageContent() {
     if (e) e.stopPropagation();
     if ((product.stockQuantity ?? 10) <= 0 && product.inStock === false) return;
 
-    const itemImage = product.imageUrl || (product.images && product.images[0]) || '/MARVEL_VARIETIES-removebg-preview.png';
+    const itemImage = product.imageUrl || (product.images && product.images[0]) || '/icon.png';
 
     addItem({
       id: product.id,

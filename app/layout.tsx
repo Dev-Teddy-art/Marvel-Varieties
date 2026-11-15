@@ -71,7 +71,7 @@ export const metadata: Metadata = {
       'Order quality household items, hair extensions, and gadgets directly from Marvel Varieties. Quick Lagos dispatch and nationwide delivery.',
     images: [
       {
-        url: '/MARVEL_VARIETIES-removebg-preview.png',
+        url: '/icon.png',
         width: 800,
         height: 600,
         alt: 'Marvel Varieties Logo & Storefront',
@@ -82,7 +82,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Marvel Varieties | Quality Essentials Lagos',
     description: 'Shop household appliances, footwear, and essentials with direct bank transfer payment verification.',
-    images: ['/MARVEL_VARIETIES-removebg-preview.png'],
+    images: ['/icon.png'],
   },
   robots: {
     index: true,
@@ -108,8 +108,8 @@ export default function RootLayout({
     name: 'Marvel Varieties',
     alternateName: ['marvelvarieties', 'Marvel-Varieties', 'Marvel Varieties Store'],
     url: 'https://marvelvarieties.com',
-    logo: 'https://marvelvarieties.com/MARVEL_VARIETIES-removebg-preview.png',
-    image: 'https://marvelvarieties.com/MARVEL_VARIETIES-removebg-preview.png',
+    logo: 'https://marvelvarieties.com/icon.png',
+    image: 'https://marvelvarieties.com/icon.png',
     description:
       'Official store of Marvel Varieties for quality household appliances, hair products, and fashion items in Lagos, Nigeria.',
     address: {
