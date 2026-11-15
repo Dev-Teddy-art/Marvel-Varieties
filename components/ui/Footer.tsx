@@ -53,7 +53,7 @@ export function Footer() {
           <div className="space-y-4">
             <div className="relative h-10 w-36">
               <Image 
-                src="/MARVEL_VARIETIES-removebg-preview.png" 
+                src="/icon.png" 
                 alt="Marvel Varieties" 
                 fill 
                 sizes="144px"

@@ -89,7 +89,7 @@ export function Navbar({ activeCategory, onSelectCategory }: NavbarProps) {
         <Link href="/" className="flex items-center gap-2 shrink-0">
           <div className="relative h-10 w-32 sm:h-12 sm:w-40">
             <Image 
-              src="/MARVEL_VARIETIES-removebg-preview.png" 
+              src="/icon.png" 
               alt="Marvel Varieties" 
               fill 
               sizes="(max-width: 640px) 128px, 160px"
