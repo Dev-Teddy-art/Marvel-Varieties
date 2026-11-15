@@ -2,7 +2,14 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { products, orders, users, storeSettings, ColorVariant } from '@/lib/db/schema';
+import {
+  products,
+  orders,
+  users,
+  storeSettings,
+  ColorVariant,
+  DeliveryZone,
+} from '@/lib/db/schema';
 import { desc, eq, or } from 'drizzle-orm';
 import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
 
@@ -460,8 +467,18 @@ export async function loginUserAction(identifier: string, pass: string) {
 }
 
 // ==========================================
-// 5. STORE SETTINGS & BANK INFO ACTIONS (CACHED)
+// 5. STORE SETTINGS, BANK INFO & DELIVERY ZONES (CACHED)
 // ==========================================
+
+const DEFAULT_DELIVERY_ZONES: DeliveryZone[] = [
+  { id: 'pickup', label: 'Store Pickup — 3 Olanipekun St, Ojodu Berger', fee: 0 },
+  { id: 'berger_ikeja', label: 'Ojodu Berger / Ikeja / Omole / Magodo', fee: 2500 },
+  { id: 'mainland_central', label: 'Yaba / Surulere / Maryland / Gbagada', fee: 3500 },
+  { id: 'mainland_outer', label: 'Festac / Alimosho / Ikorodu / Egbeda', fee: 4500 },
+  { id: 'island_core', label: 'Lagos Island / Ikoyi / Victoria Island / Lekki Phase 1', fee: 5500 },
+  { id: 'island_far', label: 'Chevron / Ajah / Sangotedo / Badore', fee: 7000 },
+  { id: 'interstate', label: 'Outside Lagos (Nationwide Interstate Waybill)', fee: 8500 },
+];
 
 const getCachedStoreSettings = unstable_cache(
   async () => {
@@ -481,11 +498,19 @@ const getCachedStoreSettings = unstable_cache(
         contactPhone: '+234 706 229 7299',
         whatsappNumber: '07062297299',
         operatingHours: 'Mon – Sat: 8:00 AM – 6:00 PM',
+        deliveryZones: DEFAULT_DELIVERY_ZONES,
       };
       await db.insert(storeSettings).values(initial);
       return initial;
     }
-    return settings[0];
+
+    return {
+      ...settings[0],
+      deliveryZones:
+        Array.isArray(settings[0].deliveryZones) && settings[0].deliveryZones.length > 0
+          ? settings[0].deliveryZones
+          : DEFAULT_DELIVERY_ZONES,
+    };
   },
   ['marvel-store-settings'],
   { tags: ['store_settings'], revalidate: 3600 }
@@ -504,6 +529,7 @@ export async function getStoreSettingsAction() {
       contactPhone: '+234 706 229 7299',
       whatsappNumber: '07062297299',
       operatingHours: 'Mon – Sat: 8:00 AM – 6:00 PM',
+      deliveryZones: DEFAULT_DELIVERY_ZONES,
     };
   }
 }
@@ -516,18 +542,31 @@ export async function updateStoreSettingsAction(data: {
   contactPhone: string;
   whatsappNumber: string;
   operatingHours: string;
+  deliveryZones?: DeliveryZone[];
 }) {
   try {
+    const cleanZones = Array.isArray(data.deliveryZones)
+      ? data.deliveryZones
+          .filter((z) => z.label && z.label.trim().length > 0)
+          .map((z) => ({
+            id: z.id || `zone_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            label: z.label.trim(),
+            fee: Math.max(0, Number(z.fee) || 0),
+          }))
+      : DEFAULT_DELIVERY_ZONES;
+
     await db
       .insert(storeSettings)
       .values({
         id: 'default_store_settings',
         ...data,
+        deliveryZones: cleanZones,
       })
       .onConflictDoUpdate({
         target: storeSettings.id,
         set: {
           ...data,
+          deliveryZones: cleanZones,
           updatedAt: new Date(),
         },
       });

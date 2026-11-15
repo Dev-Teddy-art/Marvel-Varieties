@@ -7,6 +7,12 @@ export interface ColorVariant {
   stock: number; // units available for this specific color shade
 }
 
+export interface DeliveryZone {
+  id: string;
+  label: string;
+  fee: number;
+}
+
 export const products = pgTable('products', {
   id: text('id').primaryKey(),
   title: text('title').notNull(),
@@ -60,5 +66,16 @@ export const storeSettings = pgTable('store_settings', {
   contactPhone: text('contact_phone').default('+234 706 229 7299'),
   whatsappNumber: text('whatsapp_number').default('07062297299'),
   operatingHours: text('operating_hours').default('Mon – Sat: 8:00 AM – 6:00 PM'),
+  deliveryZones: json('delivery_zones')
+    .$type<DeliveryZone[]>()
+    .default([
+      { id: 'pickup', label: 'Store Pickup — 3 Olanipekun St, Ojodu Berger', fee: 0 },
+      { id: 'berger_ikeja', label: 'Ojodu Berger / Ikeja / Omole / Magodo', fee: 2500 },
+      { id: 'mainland_central', label: 'Yaba / Surulere / Maryland / Gbagada', fee: 3500 },
+      { id: 'mainland_outer', label: 'Festac / Alimosho / Ikorodu / Egbeda', fee: 4500 },
+      { id: 'island_core', label: 'Lagos Island / Ikoyi / Victoria Island / Lekki Phase 1', fee: 5500 },
+      { id: 'island_far', label: 'Chevron / Ajah / Sangotedo / Badore', fee: 7000 },
+      { id: 'interstate', label: 'Outside Lagos (Nationwide Interstate Waybill)', fee: 8500 },
+    ]),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

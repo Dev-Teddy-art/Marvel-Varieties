@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { useCart } from '@/lib/store/useCart';
 import { OrderCountdown } from '@/components/ui/OrderCountdown';
 import { createOrderAction, getStoreSettingsAction } from '@/lib/actions';
+import { DeliveryZone } from '@/lib/db/schema';
 import { 
   ArrowLeft, 
   ShieldCheck, 
@@ -21,15 +22,14 @@ import {
   UserCheck
 } from 'lucide-react';
 
-const LAGOS_AREAS = [
-  'Ojodu Berger / Ikeja',
-  'Lagos Island / Victoria Island / Lekki Phase 1',
-  'Chevron / Ajah / Sangotedo',
-  'Surulere / Yaba / Maryland',
-  'Festac / Mile 2 / Trade Fair',
-  'Ikorodu / Ketu / Mile 12',
-  'Alimosho / Egbeda / Iyana Ipaja',
-  'Outside Lagos (Nationwide Interstate Logistics)',
+const FALLBACK_ZONES: DeliveryZone[] = [
+  { id: 'pickup', label: 'Store Pickup — 3 Olanipekun St, Ojodu Berger', fee: 0 },
+  { id: 'berger_ikeja', label: 'Ojodu Berger / Ikeja / Omole / Magodo', fee: 2500 },
+  { id: 'mainland_central', label: 'Yaba / Surulere / Maryland / Gbagada', fee: 3500 },
+  { id: 'mainland_outer', label: 'Festac / Alimosho / Ikorodu / Egbeda', fee: 4500 },
+  { id: 'island_core', label: 'Lagos Island / Ikoyi / Victoria Island / Lekki Phase 1', fee: 5500 },
+  { id: 'island_far', label: 'Chevron / Ajah / Sangotedo / Badore', fee: 7000 },
+  { id: 'interstate', label: 'Outside Lagos (Nationwide Interstate Waybill)', fee: 8500 },
 ];
 
 export default function CheckoutPage() {
@@ -52,22 +52,24 @@ export default function CheckoutPage() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
-  const [deliveryState, setDeliveryState] = useState(LAGOS_AREAS[0]);
   const [deliveryAddress, setDeliveryAddress] = useState('');
-  const [alternatePhone, setAlternatePhone] = useState('');
   const [isDropship, setIsDropship] = useState(false);
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
 
-  // Live Bank Details State
+  // Dynamic Delivery Zones & Store Bank Details
+  const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>(FALLBACK_ZONES);
+  const [selectedZoneId, setSelectedZoneId] = useState<string>(FALLBACK_ZONES[1].id);
   const [bankSettings, setBankSettings] = useState({
     bankName: 'OPay',
     accountNumber: '7062297299',
     accountName: 'OYELEYE MARVELLOUS',
   });
 
-  // Calculate dynamic delivery fee
-  const deliveryFee = deliveryState.includes('Outside Lagos') ? 4500 : 2500;
+  // Compute dynamic delivery fee from selected axis
+  const activeZone =
+    deliveryZones.find((z) => z.id === selectedZoneId) || deliveryZones[0];
+  const deliveryFee = activeZone ? Number(activeZone.fee) : 2500;
   const grandTotal = totalPrice + deliveryFee;
 
   useEffect(() => {
@@ -82,8 +84,8 @@ export default function CheckoutPage() {
       } catch (e) {}
     }
 
-    // 2. Load live bank settings from database
-    async function fetchBankInfo() {
+    // 2. Load live bank settings & admin-configured delivery zones
+    async function fetchStoreConfig() {
       const data = await getStoreSettingsAction();
       if (data) {
         setBankSettings({
@@ -91,9 +93,17 @@ export default function CheckoutPage() {
           accountNumber: data.accountNumber || '7062297299',
           accountName: data.accountName || 'OYELEYE MARVELLOUS',
         });
+
+        if (Array.isArray(data.deliveryZones) && data.deliveryZones.length > 0) {
+          setDeliveryZones(data.deliveryZones);
+          // Default to the first paid Lagos axis if available, else first option
+          const defaultZone =
+            data.deliveryZones.find((z) => z.fee > 0) || data.deliveryZones[0];
+          setSelectedZoneId(defaultZone.id);
+        }
       }
     }
-    fetchBankInfo();
+    fetchStoreConfig();
   }, []);
 
   const handleCopyAccount = () => {
@@ -117,12 +127,12 @@ export default function CheckoutPage() {
     e.preventDefault();
 
     if (timerExpired) {
-      alert('Your 1-minute payment session expired. Please refresh the page to restart.');
+      alert('Your 5-minute payment session expired. Please refresh the page to restart.');
       return;
     }
 
-    if (!customerName.trim() || !customerPhone.trim()) {
-      alert('Please enter your full name and phone number.');
+    if (!customerName.trim() || !customerPhone.trim() || !customerEmail.trim()) {
+      alert('Please enter your full name, phone number, and email address.');
       return;
     }
 
@@ -140,15 +150,19 @@ export default function CheckoutPage() {
     const orderRef = `MV-${Date.now().toString().slice(-6)}`;
 
     try {
+      const zoneSummary = activeZone
+        ? `${activeZone.label} (₦${Number(activeZone.fee).toLocaleString()})`
+        : 'Standard Delivery';
+
       const res = await createOrderAction({
         orderReference: orderRef,
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
         customerEmail: customerEmail.trim(),
-        deliveryState,
+        deliveryState: zoneSummary,
         deliveryAddress: deliveryAddress.trim(),
         recipientName: isDropship ? recipientName.trim() : customerName.trim(),
-        recipientPhone: isDropship ? recipientPhone.trim() : (alternatePhone.trim() || customerPhone.trim()),
+        recipientPhone: isDropship ? recipientPhone.trim() : customerPhone.trim(),
         isDropship,
         totalAmount: grandTotal,
         receiptUrl: receiptPreview,
@@ -262,9 +276,9 @@ export default function CheckoutPage() {
       </header>
 
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        {/* 1-Minute Payment Countdown Timer */}
+        {/* 5-Minute Payment Countdown Timer */}
         <OrderCountdown
-          initialMinutes={1}
+          initialMinutes={5}
           onExpire={() => setTimerExpired(true)}
         />
 
@@ -273,7 +287,7 @@ export default function CheckoutPage() {
             <div className="flex items-center gap-2">
               <AlertCircle size={18} className="shrink-0" />
               <span>
-                Your 1-minute reservation window has ended. Please refresh this page to begin a new verification session.
+                Your 5-minute reservation window has ended. Please refresh this page to begin a new verification session.
               </span>
             </div>
             <button
@@ -318,7 +332,7 @@ export default function CheckoutPage() {
                   </div>
 
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Phone / WhatsApp Number *</label>
+                    <label className="font-bold text-slate-700 block mb-1">Phone Number *</label>
                     <input
                       type="tel"
                       required
@@ -331,9 +345,10 @@ export default function CheckoutPage() {
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Email Address (Optional)</label>
+                  <label className="font-bold text-slate-700 block mb-1">Email Address *</label>
                   <input
                     type="email"
+                    required
                     placeholder="e.g. name@example.com"
                     value={customerEmail}
                     onChange={(e) => setCustomerEmail(e.target.value)}
@@ -341,15 +356,23 @@ export default function CheckoutPage() {
                   />
                 </div>
 
+                {/* Dynamic Delivery Zone Selector */}
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Delivery Destination / Region *</label>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Dispatch / Delivery Axis *
+                  </label>
                   <select
-                    value={deliveryState}
-                    onChange={(e) => setDeliveryState(e.target.value)}
+                    value={selectedZoneId}
+                    onChange={(e) => setSelectedZoneId(e.target.value)}
                     className="w-full bg-white border border-slate-200 rounded-xl p-3 font-semibold focus:outline-none focus:border-[#0B1B3D]"
                   >
-                    {LAGOS_AREAS.map((area) => (
-                      <option key={area} value={area}>{area}</option>
+                    {deliveryZones.map((zone) => (
+                      <option key={zone.id} value={zone.id}>
+                        {zone.label} —{' '}
+                        {Number(zone.fee) === 0
+                          ? 'FREE (₦0)'
+                          : `₦${Number(zone.fee).toLocaleString()}`}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -362,17 +385,6 @@ export default function CheckoutPage() {
                     placeholder="e.g. Flat 4, 12 Olanipekun Street, Opposite Akiode Health Centre..."
                     value={deliveryAddress}
                     onChange={(e) => setDeliveryAddress(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Alternative Phone Number (Optional)</label>
-                  <input
-                    type="tel"
-                    placeholder="e.g. 08123456789"
-                    value={alternatePhone}
-                    onChange={(e) => setAlternatePhone(e.target.value)}
                     className="w-full bg-white border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
                   />
                 </div>
@@ -425,7 +437,7 @@ export default function CheckoutPage() {
                 <span className="text-[10px] font-black uppercase tracking-wider text-[#D4AF37] flex items-center gap-1.5">
                   <Building2 size={14} /> Official Settlement Account
                 </span>
-                <span className="text-[10px] text-amber-300 font-bold">1-Min Window</span>
+                <span className="text-[10px] text-amber-300 font-bold">5-Min Window</span>
               </div>
 
               <div className="space-y-1 text-xs">
@@ -521,7 +533,9 @@ export default function CheckoutPage() {
                 </div>
                 <div className="flex justify-between text-slate-500">
                   <span>Logistics / Dispatch</span>
-                  <span className="font-bold text-slate-800">₦{deliveryFee.toLocaleString()}</span>
+                  <span className="font-bold text-slate-800">
+                    {deliveryFee === 0 ? 'FREE (₦0)' : `₦${deliveryFee.toLocaleString()}`}
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm font-black text-[#0B1B3D] border-t border-slate-100 pt-2">
                   <span>Total Due</span>
