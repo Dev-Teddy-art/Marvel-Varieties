@@ -1,48 +1,35 @@
-// components/ui/WhatsAppButton.tsx
+// components/ui/whatsAppButton.tsx
 'use client';
 
 import React from 'react';
+import { usePathname } from 'next/navigation';
 
-interface WhatsAppButtonProps {
-  phoneNumber?: string;
-  defaultMessage?: string;
-}
+export function WhatsAppButton() {
+  const pathname = usePathname();
 
-export function WhatsAppButton({
-  phoneNumber = '2347062297299',
-  defaultMessage = 'Hello Marvel Varieties, I would like to make an inquiry about your products.',
-}: WhatsAppButtonProps) {
-  const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(defaultMessage)}`;
+  // Hide on checkout so the "Submit Order" button is 100% unobstructed on mobile
+  if (pathname === '/checkout') return null;
+
+  const whatsappUrl =
+    'https://wa.me/2347062297299?text=Hello%20Marvel%20Varieties%2C%20I%20need%20help%20with%20an%20order.';
 
   return (
-    <aside aria-label="WhatsApp Support">
-      <a
-        href={whatsappUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-50 flex items-center gap-2.5 bg-[#25D366] hover:bg-[#20ba5a] text-white px-4 py-3 rounded-full shadow-[0_4px_20px_rgba(37,211,102,0.45)] hover:shadow-[0_6px_25px_rgba(37,211,102,0.65)] hover:scale-105 active:scale-95 transition-all duration-300 group select-none"
-        aria-label="Chat with Marvel Varieties on WhatsApp"
+    <a
+      href={whatsappUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Chat on WhatsApp"
+      title="Chat on WhatsApp"
+      className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-40 h-11 w-11 md:h-12 md:w-12 rounded-full bg-[#25D366] hover:bg-[#1ebe5d] text-white shadow-lg flex items-center justify-center transition-transform active:scale-95"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        className="h-5 w-5 md:h-6 md:w-6"
       >
-        {/* Pulsing indicator dot */}
-        <span className="relative flex h-2.5 w-2.5">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-80" />
-          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white" />
-        </span>
-
-        {/* Official WhatsApp SVG Icon */}
-        <svg
-          className="w-5 h-5 fill-current shrink-0"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path d="M20.52 3.48A11.93 11.93 0 0 0 12.06 0C5.46 0 .09 5.37.09 11.97c0 2.11.55 4.17 1.6 5.99L0 24l6.22-1.63a11.9 11.9 0 0 0 5.84 1.51h.01c6.6 0 11.97-5.37 11.97-11.97 0-3.2-1.25-6.21-3.52-8.43zM12.06 21.92h-.01a9.92 9.92 0 0 1-5.06-1.39l-.36-.22-3.76.99 1-3.66-.24-.38a9.92 9.92 0 0 1-1.52-5.29c0-5.48 4.46-9.94 9.95-9.94 2.65 0 5.15 1.03 7.03 2.91a9.88 9.88 0 0 1 2.91 7.03c0 5.49-4.46 9.95-9.95 9.95zm5.45-7.44c-.3-.15-1.77-.87-2.04-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.95 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51-.17-.01-.37-.01-.57-.01-.2 0-.52.07-.8.37-.27.3-1.05 1.03-1.05 2.51 0 1.48 1.08 2.91 1.23 3.11.15.2 2.13 3.25 5.16 4.56.72.31 1.28.5 1.72.64.72.23 1.38.2 1.9.12.58-.09 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.12-.27-.2-.57-.35z" />
-        </svg>
-
-        {/* Button Label */}
-        <span className="font-extrabold text-xs tracking-wide">
-          Chat with us
-        </span>
-      </a>
-    </aside>
+        <path d="M12.031 2c-5.516 0-9.969 4.453-9.969 9.969 0 1.758.459 3.473 1.332 4.986L2 22l5.188-1.361a9.927 9.927 0 0 0 4.843 1.258h.004c5.515 0 9.969-4.454 9.969-9.969A9.936 9.936 0 0 0 19.08 4.92 9.905 9.905 0 0 0 12.031 2Zm5.822 14.262c-.246.693-1.434 1.326-1.99 1.409-.51.076-1.155.108-1.864-.117-.43-.137-.982-.32-1.69-.626-2.976-1.285-4.92-4.283-5.069-4.482-.148-.198-1.21-1.61-1.21-3.071 0-1.461.766-2.18 1.038-2.477.272-.297.594-.371.792-.371.198 0 .396.002.569.01.183.009.428-.07.669.51.247.594.841 2.054.915 2.203.074.148.124.322.025.52-.099.198-.149.322-.297.495-.148.173-.312.387-.446.52-.148.148-.303.309-.13.606.173.297.769 1.269 1.651 2.055 1.135 1.012 2.092 1.326 2.389 1.474.297.149.47.124.644-.074.173-.198.742-.866.94-1.163.198-.297.396-.248.668-.149.272.099 1.732.817 2.029.965.297.149.495.223.569.347.074.124.074.718-.172 1.411Z" />
+      </svg>
+    </a>
   );
 }

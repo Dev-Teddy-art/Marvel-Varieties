@@ -7,7 +7,6 @@ import Image from 'next/image';
 import { useCart } from '@/lib/store/useCart';
 import { OrderCountdown } from '@/components/ui/OrderCountdown';
 import { createOrderAction, getStoreSettingsAction } from '@/lib/actions';
-import { DeliveryZone } from '@/lib/db/schema';
 import { 
   ArrowLeft, 
   ShieldCheck, 
@@ -19,17 +18,48 @@ import {
   ShoppingBag, 
   Truck, 
   AlertCircle,
-  UserCheck
+  UserCheck,
+  Info
 } from 'lucide-react';
 
-const FALLBACK_ZONES: DeliveryZone[] = [
-  { id: 'pickup', label: 'Store Pickup — 3 Olanipekun St, Ojodu Berger', fee: 0 },
-  { id: 'berger_ikeja', label: 'Ojodu Berger / Ikeja / Omole / Magodo', fee: 2500 },
-  { id: 'mainland_central', label: 'Yaba / Surulere / Maryland / Gbagada', fee: 3500 },
-  { id: 'mainland_outer', label: 'Festac / Alimosho / Ikorodu / Egbeda', fee: 4500 },
-  { id: 'island_core', label: 'Lagos Island / Ikoyi / Victoria Island / Lekki Phase 1', fee: 5500 },
-  { id: 'island_far', label: 'Chevron / Ajah / Sangotedo / Badore', fee: 7000 },
-  { id: 'interstate', label: 'Outside Lagos (Nationwide Interstate Waybill)', fee: 8500 },
+const NIGERIAN_STATES = [
+  'Lagos',
+  'Abuja (FCT)',
+  'Ogun',
+  'Oyo',
+  'Rivers',
+  'Abia',
+  'Adamawa',
+  'Akwa Ibom',
+  'Anambra',
+  'Bauchi',
+  'Bayelsa',
+  'Benue',
+  'Borno',
+  'Cross River',
+  'Delta',
+  'Ebonyi',
+  'Edo',
+  'Ekiti',
+  'Enugu',
+  'Gombe',
+  'Imo',
+  'Jigawa',
+  'Kaduna',
+  'Kano',
+  'Katsina',
+  'Kebbi',
+  'Kogi',
+  'Kwara',
+  'Nasarawa',
+  'Niger',
+  'Ondo',
+  'Osun',
+  'Plateau',
+  'Sokoto',
+  'Taraba',
+  'Yobe',
+  'Zamfara',
 ];
 
 export default function CheckoutPage() {
@@ -53,24 +83,22 @@ export default function CheckoutPage() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [nearestBusStop, setNearestBusStop] = useState('');
+  const [deliveryState, setDeliveryState] = useState('Lagos');
+  const [orderNote, setOrderNote] = useState('');
   const [isDropship, setIsDropship] = useState(false);
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
 
-  // Dynamic Delivery Zones & Store Bank Details
-  const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>(FALLBACK_ZONES);
-  const [selectedZoneId, setSelectedZoneId] = useState<string>(FALLBACK_ZONES[1].id);
+  // Live Bank Details State
   const [bankSettings, setBankSettings] = useState({
     bankName: 'OPay',
     accountNumber: '7062297299',
     accountName: 'OYELEYE MARVELLOUS',
   });
 
-  // Compute dynamic delivery fee from selected axis
-  const activeZone =
-    deliveryZones.find((z) => z.id === selectedZoneId) || deliveryZones[0];
-  const deliveryFee = activeZone ? Number(activeZone.fee) : 2500;
-  const grandTotal = totalPrice + deliveryFee;
+  // Customer pays item subtotal upfront; delivery fee is confirmed separately
+  const grandTotal = totalPrice;
 
   useEffect(() => {
     // 1. Pre-fill details if a user happens to be logged in, otherwise allow guest entry
@@ -84,8 +112,8 @@ export default function CheckoutPage() {
       } catch (e) {}
     }
 
-    // 2. Load live bank settings & admin-configured delivery zones
-    async function fetchStoreConfig() {
+    // 2. Load live bank settings from database
+    async function fetchBankInfo() {
       const data = await getStoreSettingsAction();
       if (data) {
         setBankSettings({
@@ -93,17 +121,9 @@ export default function CheckoutPage() {
           accountNumber: data.accountNumber || '7062297299',
           accountName: data.accountName || 'OYELEYE MARVELLOUS',
         });
-
-        if (Array.isArray(data.deliveryZones) && data.deliveryZones.length > 0) {
-          setDeliveryZones(data.deliveryZones);
-          // Default to the first paid Lagos axis if available, else first option
-          const defaultZone =
-            data.deliveryZones.find((z) => z.fee > 0) || data.deliveryZones[0];
-          setSelectedZoneId(defaultZone.id);
-        }
       }
     }
-    fetchStoreConfig();
+    fetchBankInfo();
   }, []);
 
   const handleCopyAccount = () => {
@@ -136,13 +156,13 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (!receiptPreview) {
-      alert('Please upload a screenshot or image of your bank transfer receipt.');
+    if (!deliveryAddress.trim() || !nearestBusStop.trim()) {
+      alert('Please provide your street address and nearest bus stop.');
       return;
     }
 
-    if (!deliveryAddress.trim()) {
-      alert('Please provide your complete delivery street address.');
+    if (!receiptPreview) {
+      alert('Please upload a screenshot or image of your bank transfer receipt.');
       return;
     }
 
@@ -150,19 +170,18 @@ export default function CheckoutPage() {
     const orderRef = `MV-${Date.now().toString().slice(-6)}`;
 
     try {
-      const zoneSummary = activeZone
-        ? `${activeZone.label} (₦${Number(activeZone.fee).toLocaleString()})`
-        : 'Standard Delivery';
+      const formattedAddress = `${deliveryAddress.trim()} (Nearest Bus Stop: ${nearestBusStop.trim()})`;
 
       const res = await createOrderAction({
         orderReference: orderRef,
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
         customerEmail: customerEmail.trim(),
-        deliveryState: zoneSummary,
-        deliveryAddress: deliveryAddress.trim(),
+        deliveryState,
+        deliveryAddress: formattedAddress,
         recipientName: isDropship ? recipientName.trim() : customerName.trim(),
         recipientPhone: isDropship ? recipientPhone.trim() : customerPhone.trim(),
+        alternateAddress: orderNote.trim(),
         isDropship,
         totalAmount: grandTotal,
         receiptUrl: receiptPreview,
@@ -206,7 +225,7 @@ export default function CheckoutPage() {
           </div>
 
           <p className="text-xs text-slate-500 leading-relaxed">
-            Our dispatch admin will verify your bank transfer slip and package your items for delivery. Use your reference number or phone number to track your order anytime.
+            Our team will verify your transfer slip and reach out via WhatsApp/phone to confirm your location&apos;s delivery fee and dispatch schedule.
           </p>
 
           <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
@@ -356,35 +375,62 @@ export default function CheckoutPage() {
                   />
                 </div>
 
-                {/* Dynamic Delivery Zone Selector */}
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">
-                    Dispatch / Delivery Axis *
-                  </label>
-                  <select
-                    value={selectedZoneId}
-                    onChange={(e) => setSelectedZoneId(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl p-3 font-semibold focus:outline-none focus:border-[#0B1B3D]"
-                  >
-                    {deliveryZones.map((zone) => (
-                      <option key={zone.id} value={zone.id}>
-                        {zone.label} —{' '}
-                        {Number(zone.fee) === 0
-                          ? 'FREE (₦0)'
-                          : `₦${Number(zone.fee).toLocaleString()}`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Street Address / Landmark *</label>
+                  <label className="font-bold text-slate-700 block mb-1">Street Address (with house number & street name) *</label>
                   <textarea
                     rows={2}
                     required
-                    placeholder="e.g. Flat 4, 12 Olanipekun Street, Opposite Akiode Health Centre..."
+                    placeholder="e.g. Flat 4, 12 Olanipekun Street, Ojodu Berger..."
                     value={deliveryAddress}
                     onChange={(e) => setDeliveryAddress(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Nearest Bus Stop *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Berger Bus Stop / Akiode"
+                      value={nearestBusStop}
+                      onChange={(e) => setNearestBusStop(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">State *</label>
+                    <select
+                      value={deliveryState}
+                      onChange={(e) => setDeliveryState(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl p-3 font-semibold focus:outline-none focus:border-[#0B1B3D]"
+                    >
+                      {NIGERIAN_STATES.map((st) => (
+                        <option key={st} value={st}>
+                          {st === 'Lagos' ? 'Lagos' : `Other States / ${st}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Delivery Fee Separate Confirmation Note */}
+                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex items-start gap-2 text-slate-600">
+                  <Info size={15} className="text-[#0B1B3D] shrink-0 mt-0.5" />
+                  <p className="leading-relaxed font-medium">
+                    Delivery fees are dependent on your location and will be confirmed separately.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Extra note for this order (optional)</label>
+                  <textarea
+                    rows={2}
+                    placeholder="Any delivery instructions, preferred time, or landmark details..."
+                    value={orderNote}
+                    onChange={(e) => setOrderNote(e.target.value)}
                     className="w-full bg-white border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#0B1B3D]"
                   />
                 </div>
@@ -532,13 +578,11 @@ export default function CheckoutPage() {
                   <span className="font-bold text-slate-800">₦{totalPrice.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-slate-500">
-                  <span>Logistics / Dispatch</span>
-                  <span className="font-bold text-slate-800">
-                    {deliveryFee === 0 ? 'FREE (₦0)' : `₦${deliveryFee.toLocaleString()}`}
-                  </span>
+                  <span>Delivery Fee</span>
+                  <span className="font-semibold text-amber-700">Confirmed separately</span>
                 </div>
                 <div className="flex justify-between text-sm font-black text-[#0B1B3D] border-t border-slate-100 pt-2">
-                  <span>Total Due</span>
+                  <span>Total Due Now</span>
                   <span className="text-[#D4AF37] font-black text-base">₦{grandTotal.toLocaleString()}</span>
                 </div>
               </div>
@@ -557,7 +601,7 @@ export default function CheckoutPage() {
 
               <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400">
                 <ShieldCheck size={14} className="text-[#D4AF37]" />
-                <span>Verified Direct Settlement • Fast Lagos Dispatch</span>
+                <span>Verified Direct Settlement • Fast Dispatch</span>
               </div>
             </div>
           </div>
